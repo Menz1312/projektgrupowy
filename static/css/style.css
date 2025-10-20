@@ -1,3 +1,37 @@
+/* === Wybór tematu === */
+:root {
+  --bg:#f5f7fb; --surface:#ffffff; --text:#1f2937; --muted:#6b7280;
+  --border:#e5e7eb; --primary:#2563eb; --primary-contrast:#ffffff;
+  --success:#22c55e; --error:#ef4444;
+}
+:root[data-theme="dark"] {
+  --bg:#0b1220; --surface:#121a2a; --text:#e5e7eb; --muted:#94a3b8;
+  --border:#1f2a44; --primary:#3b82f6; --primary-contrast:#0b1220;
+  --success:#16a34a; --error:#f43f5e;
+}
+
+/* Bazowe elementy pod zmienne */
+html, body { background: var(--bg); color: var(--text); }
+nav { background: var(--surface); border-bottom: 1px solid var(--border); }
+a { color: var(--primary); }
+.container { background: var(--surface); border: 1px solid var(--border); }
+.messages .success { background-color: var(--success); }
+.messages .error { background-color: var(--error); }
+
+/* Przycisk przełącznika */
+.theme-toggle {
+  margin-left: 1rem; padding: .5rem .7rem; border-radius: 8px;
+  border: 1px solid var(--border); background: var(--surface); color: var(--text);
+  cursor: pointer;
+}
+
+/* (Opcjonalnie) twarde nadpisania, jeśli masz stare kolory inline */
+html, body{ background: var(--bg) !important; color: var(--text) !important; }
+nav{ background: var(--surface) !important; border-bottom:1px solid var(--border) !important; }
+.container{ background: var(--surface) !important; border:1px solid var(--border) !important; }
+
+
+
 body { 
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
     background-color: #f0f2f5; 
@@ -96,3 +130,45 @@ input[type="text"], input[type="search"], input[type="email"], input[type="passw
 }
 .messages .success { background-color: #28a745; }
 .messages .error { background-color: #dc3545; }
+
+/* === Dark mode overrides (quick patch) === */
+html[data-theme="dark"] body { 
+  background-color: #0b1220 !important; 
+  color: #e5e7eb !important; 
+}
+
+html[data-theme="dark"] nav { 
+  background: #121a2a !important; 
+  border-bottom: 1px solid #1f2a44 !important; 
+}
+html[data-theme="dark"] nav a.logo { color: #e5e7eb !important; }
+html[data-theme="dark"] nav .links a { color: #3b82f6 !important; }
+
+html[data-theme="dark"] .container { 
+  background: #121a2a !important; 
+  border: 1px solid #1f2a44 !important; 
+  color: #e5e7eb !important; 
+}
+
+html[data-theme="dark"] .quiz-list .quiz-item { 
+  background: #121a2a !important; 
+  border: 1px solid #1f2a44 !important; 
+}
+
+html[data-theme="dark"] .messages .success { background-color: #16a34a !important; }
+html[data-theme="dark"] .messages .error { background-color: #f43f5e !important; }
+
+html[data-theme="dark"] .btn-primary { background: #3b82f6 !important; color: #0b1220 !important; border: none !important; }
+html[data-theme="dark"] .btn-secondary { background: #64748b !important; color: #0b1220 !important; border: none !important; }
+html[data-theme="dark"] .btn-danger { background: #ef4444 !important; color: #ffffff !important; border: none !important; }
+
+html[data-theme="dark"] input[type="text"],
+html[data-theme="dark"] input[type="search"],
+html[data-theme="dark"] input[type="email"],
+html[data-theme="dark"] input[type="password"],
+html[data-theme="dark"] select {
+  background: #0f172a !important;
+  color: #e5e7eb !important;
+  border: 1px solid #1f2a44 !important;
+}
+

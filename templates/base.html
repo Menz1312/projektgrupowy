@@ -2,49 +2,58 @@
 <!DOCTYPE html>
 <html lang="pl">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}AuthApp{% endblock %}</title>
-    <style>
-        body { font-family: sans-serif; margin: 0; padding: 0; background-color: #f4f4f4; }
-        nav { background-color: #fff; padding: 1rem 2rem; border-bottom: 1px solid #ddd; display: flex; justify-content: space-between; align-items: center; }
-        nav a.logo { text-decoration: none; font-weight: bold; font-size: 1.5rem; color: #333; }
-        nav .links a, nav .links button { margin-left: 1rem; text-decoration: none; color: #007bff; font-size: 1rem; }
-        nav .links button { background: none; border: none; cursor: pointer; padding: 0; font-family: inherit; font-weight: 500;} /* Added font-weight */
-        .container { max-width: 800px; margin: 2rem auto; padding: 2rem; background-color: #fff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-        .messages p { padding: 1rem; margin: 0; color: #fff; text-align: center; }
-        .messages .success { background-color: #28a745; }
-        .messages .error { background-color: #dc3545; }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{% block title %}QuizApp{% endblock %}</title>
+  <link rel="stylesheet" href="{% static 'css/style.css' %}">
+
+  <!-- Boot: ustaw motyw zanim strona się narysuje -->
+  <script>
+  (function () {
+    try {
+      var stored = localStorage.getItem('theme');
+      var systemDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+      var theme = stored || (systemDark ? 'dark' : 'light');
+      document.documentElement.setAttribute('data-theme', theme);
+    } catch (e) {}
+  })();
+  </script>
 </head>
 <body>
-    {% if messages %}
-    <div class="messages">
-        {% for message in messages %}
-            <p class="{{ message.tags }}">{{ message }}</p>
-        {% endfor %}
+  {% if messages %}
+  <div class="messages">
+    {% for message in messages %}
+      <p class="{{ message.tags }}">{{ message }}</p>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <nav>
+    <a href="{% url 'home' %}" class="logo">QuizApp</a>
+    <div class="links" style="display:flex;align-items:center;">
+      {% if user.is_authenticated %}
+        <span style="margin-right:1.5rem;">Witaj, {{ user.username }}!</span>
+        <a href="{% url 'my-quizzes' %}">Moje Quizy</a>
+        <form action="{% url 'logout' %}" method="post" style="display:inline;margin:0;">
+          {% csrf_token %}
+          <button type="submit" style="background:none;border:none;color:#007bff;font-weight:500;cursor:pointer;padding:0;font-size:1rem;margin-left:1.5rem;">Wyloguj</button>
+        </form>
+      {% else %}
+        <a href="{% url 'login' %}">Zaloguj</a>
+        <a href="{% url 'register' %}">Zarejestruj</a>
+      {% endif %}
+
+      <!-- Przełącznik motywu: widoczny dla KAŻDEGO -->
+      <button id="theme-toggle" class="theme-toggle" aria-label="Przełącz motyw" style="margin-left:1rem;">🌓</button>
     </div>
-    {% endif %}
-    <nav>
-        <a href="{% url 'home' %}" class="logo">AuthApp</a> {# Changed logo text #}
-        <div class="links" style="display: flex; align-items: center;">
-            {% if user.is_authenticated %}
-                <span style="margin-right: 1.5rem;">Witaj, {{ user.username }}!</span>
-                <form action="{% url 'logout' %}" method="post" style="display: inline; margin: 0;">
-                    {% csrf_token %}
-                    <button type="submit" style="margin-left: 1.5rem;">Wyloguj</button> {# Simplified button style #}
-                </form>
-            {% else %}
-                <a href="{% url 'login' %}">Zaloguj</a>
-                <a href="{% url 'register' %}">Zarejestruj</a>
-            {% endif %}
-        </div>
-    </nav>
-    <main class="container">
-        {% block content %}
-            <h2>Strona Główna</h2>
-            <p>Podstawowy szablon działa.</p>
-        {% endblock %}
-    </main>
+  </nav>
+
+  <main class="container">
+    {% block content %}{% endblock %}
+  </main>
+
+  <!-- Logika przełączania -->
+  <script src="{% static 'js/theme.js' %}"></script>
 </body>
 </html>
+
