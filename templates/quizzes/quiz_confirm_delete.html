@@ -1,0 +1,11 @@
+{% extends 'base.html' %}
+{% block title %}Potwierdź usunięcie{% endblock %}
+{% block content %}
+    <h1>Potwierdź usunięcie</h1>
+    <p>Czy na pewno chcesz trwale usunąć quiz: "{{ quiz.title }}"? Tej operacji nie można cofnąć.</p>
+    <form method="post">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-danger">Tak, usuń</button>
+        <a href="{% url 'my-quizzes' %}" class="btn btn-secondary">Anuluj</a>
+    </form>
+{% endblock %}
