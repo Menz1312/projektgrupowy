@@ -4,17 +4,26 @@
 
 {% block content %}
   <h2>Zaloguj się</h2>
+
+  {# **THIS PART DISPLAYS ERRORS** #}
   {% if form.errors %}
-    <p style="color: red;">Nazwa użytkownika lub hasło są nieprawidłowe.</p>
+    <p style="color: red; font-weight: bold;">Nazwa użytkownika lub hasło są nieprawidłowe. Spróbuj ponownie.</p>
   {% endif %}
+  {# **************************** #}
 
-  <form method="post" action="{% url 'login' %}">
-    {% csrf_token %}
-    {{ form.as_p }}
-    <button type="submit">Zaloguj</button>
-    <input type="hidden" name="next" value="{{ next }}">
-  </form>
+  {% if user.is_authenticated %}
+    <p>Jesteś już zalogowany.</p>
+  {% else %}
+    <form method="post" action="{% url 'login' %}">
+      {% csrf_token %}
+      {{ form.as_p }}
+      <button type="submit">Zaloguj</button>
+      {# Hidden input to redirect after login, if needed #}
+      <input type="hidden" name="next" value="{{ next }}">
+    </form>
 
-  {# Link do resetowania hasła #}
-  <p><a href="{% url 'password_reset' %}">Nie pamiętasz hasła?</a></p>
+    {# Link do resetowania hasła #}
+    <p style="margin-top: 1rem;"><a href="{% url 'password_reset' %}">Nie pamiętasz hasła?</a></p>
+    <p>Nie masz konta? <a href="{% url 'register' %}">Zarejestruj się</a></p>
+  {% endif %}
 {% endblock %}

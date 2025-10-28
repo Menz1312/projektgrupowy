@@ -12,4 +12,5 @@ urlpatterns = [
 
     # Prosta strona główna (wymaga pliku templates/home.html)
     path('', TemplateView.as_view(template_name='home.html'), name='home'),
+    path('', include('quizzes.urls')),
 ]
