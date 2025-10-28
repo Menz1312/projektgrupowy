@@ -1,0 +1,25 @@
+{% extends 'base.html' %}
+{% block title %}{% if form.instance.pk %}Edytuj{% else %}Dodaj{% endif %} Pytanie{% endblock %}
+
+{% block content %}
+    <a href="{% url 'quiz-edit' quiz.pk %}">&larr; Wróć do edytora quizu</a>
+    <h1>{% if form.instance.pk %}Edytuj{% else %}Dodaj{% endif %} Pytanie do quizu "{{ quiz.title }}"</h1>
+
+    <form method="post">
+        {% csrf_token %}
+        
+        {{ question_form.as_p }}
+
+        <h3 style="margin-top: 2rem;">Odpowiedzi</h3>
+        <p>Zaznacz pole przy poprawnej odpowiedzi. Musisz podać treść dla wszystkich 4 odpowiedzi.</p>
+
+        {{ answer_formset.management_form }}
+        {% for form in answer_formset %}
+            <div class="formset-row" style="background: #f8f9fa;">
+                {{ form.as_p }}
+            </div>
+        {% endfor %}
+
+        <button type="submit" class="btn btn-primary">Zapisz Pytanie</button>
+    </form>
+{% endblock %}
