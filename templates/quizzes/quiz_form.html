@@ -1,0 +1,40 @@
+{% extends 'base.html' %}
+{% block title %}{% if is_new %}Stwórz{% else %}Edytor{% endif %} Quizu{% endblock %}
+
+{% block content %}
+    <h1>{% if is_new %}Tworzenie Nowego Quizu{% else %}Edytor Quizu: {{ quiz.title }}{% endif %}</h1>
+
+    <form method="post">
+        {% csrf_token %}
+        <h2>Ustawienia Główne</h2>
+        {{ quiz_form.as_p }}
+        <button type="submit" class="btn btn-primary">
+            {% if is_new %}
+                Stwórz quiz i przejdź do dodawania pytań
+            {% else %}
+                Zapisz Ustawienia
+            {% endif %}
+        </button>
+    </form>
+
+    {# Ta sekcja pojawi się tylko w trybie edycji, gdy quiz już istnieje #}
+    {% if quiz %}
+        <hr style="margin: 2rem 0;">
+
+        <div class="quiz-list" style="margin-top: 1rem;">
+        {% for question in quiz.questions.all %}
+            <div class="quiz-item">
+                <span>{{ forloop.counter }}. {{ question.text }}</span>
+                <div style="display: flex; gap: 0.5rem;">
+                    <a href="{% url 'question-edit' question.pk %}" class="btn btn-secondary">Edytuj</a>
+                    <a href="{% url 'question-delete' question.pk %}" class="btn btn-danger">Usuń</a>
+                </div>
+            </div>
+        {% empty %}
+        {% endfor %}
+        </div>
+
+        <a href="{% url 'my-quizzes' %}" class="btn btn-secondary" style="margin-top: 2rem;">Wróć do listy moich quizów</a>
+    {% endif %}
+
+{% endblock %}

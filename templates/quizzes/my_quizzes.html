@@ -1,0 +1,23 @@
+{% extends 'base.html' %}
+{% block title %}Moje Quizy{% endblock %}
+{% block content %}
+    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;">
+        <h1>Moje Quizy</h1>
+        <a href="{% url 'quiz-create' %}" class="btn btn-primary" style="margin-bottom: 1rem;">Stwórz Nowy Quiz Ręcznie</a>
+    </div>
+ 
+    <h2>Twoja lista quizów:</h2>
+    <div class="quiz-list">
+        {% for quiz in quizzes %}
+            <div class="quiz-item">
+                <a href="{% url 'quiz-detail' quiz.pk %}">{{ quiz.title }} ({{ quiz.get_visibility_display }})</a>
+                <div style="display: flex; gap: 0.5rem;">
+                    <a href="{% url 'quiz-edit' quiz.pk %}" class="btn btn-secondary">Edytuj</a>
+                    <a href="{% url 'quiz-delete' quiz.pk %}" class="btn btn-danger">Usuń</a>
+                </div>
+            </div>
+        {% empty %}
+            <p>Nie masz jeszcze żadnych quizów.</p>
+        {% endfor %}
+    </div>
+{% endblock %}
