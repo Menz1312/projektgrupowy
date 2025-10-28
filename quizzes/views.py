@@ -1,11 +1,12 @@
-from django.shortcuts import render
-
-# Create your views here.
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
-from .models import Quiz
-from .forms import QuizForm
+from .models import Quiz, Question, Answer
+from .forms import QuizForm, QuestionForm, AnswerFormSet
+import os, json, openai
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # Widoki home_view i quiz_detail_view pozostają bez zmian
 def home_view(request):
@@ -24,6 +25,45 @@ def quiz_detail_view(request, pk):
 # Widok my_quizzes_view pozostaje bez zmian
 @login_required
 def my_quizzes_view(request):
+    if request.method == 'POST':
+        topic = request.POST.get('topic')
+        try:
+            openai.api_key = os.getenv("OPENAI_API_KEY")
+            if not openai.api_key:
+                raise ValueError("Klucz API OpenAI nie został skonfigurowany.")
+            
+            prompt = f"""
+            Wygeneruj quiz na temat "{topic}" w języku polskim. Przygotuj 5 pytań.
+            Odpowiedz wyłącznie w formacie JSON jako obiekt z kluczem "questions", który zawiera listę obiektów.
+            Każdy obiekt: "question" (string), "answers" (lista 4 stringów), "correct_indices" (lista integerów z poprawnymi indeksami od 0).
+            """
+            client = openai.OpenAI()
+            response = client.chat.completions.create(
+                model="gpt-3.5-turbo",
+                messages=[
+                    {"role": "system", "content": "Jesteś asystentem generującym quizy w formacie JSON."},
+                    {"role": "user", "content": prompt}
+                ],
+                response_format={"type": "json_object"}
+            )
+            
+            quiz_data_str = response.choices[0].message.content
+            quiz_data = json.loads(quiz_data_str).get('questions', [])
+            
+            if not quiz_data:
+                 raise ValueError("API nie zwróciło pytań w oczekiwanym formacie.")
+
+            new_quiz = Quiz.objects.create(title=f"Quiz AI: {topic}", author=request.user, visibility='PRIVATE')
+            for item in quiz_data:
+                q = Question.objects.create(quiz=new_quiz, text=item['question'])
+                for i, ans_text in enumerate(item['answers']):
+                    Answer.objects.create(question=q, text=ans_text, is_correct=(i in item.get('correct_indices', [])))
+            messages.success(request, f"Pomyślnie wygenerowano quiz na temat: {topic}!")
+
+        except Exception as e:
+            messages.error(request, f"Wystąpił błąd podczas generowania quizu: {e}")
+        return redirect('my-quizzes')
+    
     quizzes = Quiz.objects.filter(author=request.user)
     return render(request, 'quizzes/my_quizzes.html', {'quizzes': quizzes})
 
@@ -57,6 +97,67 @@ def quiz_edit_view(request, pk):
     
     # Ten widok teraz tylko edytuje tytuł/widoczność i wyświetla listę pytań
     return render(request, 'quizzes/quiz_form.html', {'quiz_form': form, 'quiz': quiz})
+
+# NOWY WIDOK
+@login_required
+def question_create_view(request, quiz_pk):
+    quiz = get_object_or_404(Quiz, pk=quiz_pk, author=request.user)
+    if request.method == 'POST':
+        question_form = QuestionForm(request.POST)
+        answer_formset = AnswerFormSet(request.POST)
+        if question_form.is_valid() and answer_formset.is_valid():
+            question = question_form.save(commit=False)
+            question.quiz = quiz
+            question.save()
+            answer_formset.instance = question
+            answer_formset.save()
+            messages.success(request, "Nowe pytanie zostało dodane.")
+            return redirect('quiz-edit', pk=quiz.pk)
+    else:
+        question_form = QuestionForm()
+        answer_formset = AnswerFormSet()
+    
+    context = {
+        'question_form': question_form,
+        'answer_formset': answer_formset,
+        'quiz': quiz
+    }
+    return render(request, 'quizzes/question_form.html', context)
+
+# NOWY WIDOK
+@login_required
+def question_edit_view(request, pk):
+    question = get_object_or_404(Question, pk=pk, quiz__author=request.user)
+    if request.method == 'POST':
+        question_form = QuestionForm(request.POST, instance=question)
+        answer_formset = AnswerFormSet(request.POST, instance=question)
+        if question_form.is_valid() and answer_formset.is_valid():
+            question_form.save()
+            answer_formset.save()
+            messages.success(request, "Pytanie zostało zaktualizowane.")
+            return redirect('quiz-edit', pk=question.quiz.pk)
+    else:
+        question_form = QuestionForm(instance=question)
+        answer_formset = AnswerFormSet(instance=question)
+        
+    context = {
+        'question_form': question_form,
+        'answer_formset': answer_formset,
+        'quiz': question.quiz
+    }
+    return render(request, 'quizzes/question_form.html', context)
+
+# NOWY WIDOK
+@login_required
+def question_delete_view(request, pk):
+    question = get_object_or_404(Question, pk=pk, quiz__author=request.user)
+    quiz_pk = question.quiz.pk
+    if request.method == 'POST':
+        question.delete()
+        messages.success(request, "Pytanie zostało usunięte.")
+        return redirect('quiz-edit', pk=quiz_pk)
+    
+    return render(request, 'quizzes/question_confirm_delete.html', {'question': question})
 
 # Widok quiz_delete_view pozostaje bez zmian
 @login_required
