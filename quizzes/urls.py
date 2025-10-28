@@ -9,4 +9,8 @@ urlpatterns = [
     path('edit/<int:pk>/', views.quiz_edit_view, name='quiz-edit'),
     path('delete/<int:pk>/', views.quiz_delete_view, name='quiz-delete'),
     
+    # Nowe ścieżki do zarządzania pytaniami
+    path('quiz/<int:quiz_pk>/add-question/', views.question_create_view, name='question-create'),
+    path('question/<int:pk>/edit/', views.question_edit_view, name='question-edit'),
+    path('question/<int:pk>/delete/', views.question_delete_view, name='question-delete'),
 ]

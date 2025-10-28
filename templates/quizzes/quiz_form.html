@@ -21,6 +21,11 @@
     {% if quiz %}
         <hr style="margin: 2rem 0;">
 
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <h2>Pytania w tym quizie</h2>
+            <a href="{% url 'question-create' quiz.pk %}" class="btn btn-primary">Dodaj Nowe Pytanie</a>
+        </div>
+
         <div class="quiz-list" style="margin-top: 1rem;">
         {% for question in quiz.questions.all %}
             <div class="quiz-item">
@@ -31,6 +36,7 @@
                 </div>
             </div>
         {% empty %}
+            <p>Ten quiz nie ma jeszcze żadnych pytań.</p>
         {% endfor %}
         </div>
 
