@@ -2,10 +2,16 @@
 {% block title %}Wynik – {{ quiz.title }}{% endblock %}
 {% block content %}
   <h1>Wynik</h1>
+
+  {% if time_over %}
+    <p style="color:#b00;"><strong>Czas minął – wynik policzony z zaznaczonych odpowiedzi.</strong></p>
+  {% endif %}
+
   <p><strong>{{ correct_count }}/{{ total }}</strong> ({{ score_percent }}%)</p>
 
   <p style="margin:1rem 0;">
     <a href="{% url 'quiz-start' pk=quiz.pk %}">Rozwiąż ponownie</a> |
+    <a href="{% url 'quiz-start' pk=quiz.pk %}?t=120">Rozwiąż ponownie (2 min)</a> |
     <a href="{% url 'quiz-detail' pk=quiz.pk %}">Wróć do szczegółów</a>
   </p>
 
@@ -21,23 +27,19 @@
           {% endif %}
         </p>
         <ul style="margin:.5rem 0 0 1rem;">
-  {% for ans in item.answers %}
-    <li>
-      {{ ans.text }}
-      {% if ans.id in item.correct_ids %}
-        <em>(poprawna)</em>
-      {% endif %}
-
-      {% if ans.id in item.chosen_ids and not ans.id in item.correct_ids %}
-        <em style="color:#b00;">(zaznaczona błędnie)</em>
-      {% endif %}
-
-      {% if ans.id in item.correct_ids and not ans.id in item.chosen_ids %}
-        <em style="opacity:.7;">(powinna być zaznaczona)</em>
-      {% endif %}
-    </li>
-  {% endfor %}
-</ul>
+          {% for ans in item.answers %}
+            <li>
+              {{ ans.text }}
+              {% if ans.id in item.correct_ids %}<em>(poprawna)</em>{% endif %}
+              {% if ans.id in item.chosen_ids and not ans.id in item.correct_ids %}
+                <em style="color:#b00;">(zaznaczona błędnie)</em>
+              {% endif %}
+              {% if ans.id in item.correct_ids and not ans.id in item.chosen_ids %}
+                <em style="opacity:.7;">(powinna być zaznaczona)</em>
+              {% endif %}
+            </li>
+          {% endfor %}
+        </ul>
       </li>
     {% endfor %}
   </ol>

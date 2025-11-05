@@ -3,16 +3,24 @@
 {% block content %}
   <h1>{{ quiz.title }}</h1>
 
-  <form method="post">
-    {% csrf_token %}
-    <ol>
-      {% for q in questions %}
-        <li style="margin-bottom:1rem;">
-          <p><strong>{{ q.text }}</strong></p>
+  {% if time_limit and time_limit > 0 %}
+    <div style="margin: .5rem 0 1rem; padding:.5rem 1rem; border:1px solid #ddd; border-radius:8px;">
+      <strong>Pozostały czas:</strong> <span id="countdown"></span>
+    </div>
+  {% endif %}
 
-          {% for ans in q.answers.all %}
+  <form id="quiz-form" method="post">
+    {% csrf_token %}
+    <input type="hidden" name="time_over" id="time_over" value="0" />
+
+    <ol>
+      {% for item in questions_data %}
+        <li style="margin-bottom:1rem;">
+          <p><strong>{{ item.q.text }}</strong></p>
+
+          {% for ans in item.answers %}
             <label style="display:block; margin:.25rem 0;">
-              <input type="checkbox" name="q_{{ q.id }}" value="{{ ans.id }}"> {{ ans.text }}
+              <input type="checkbox" name="q_{{ item.q.id }}" value="{{ ans.id }}"> {{ ans.text }}
             </label>
           {% endfor %}
 
@@ -23,4 +31,35 @@
 
     <button type="submit" class="btn btn-primary">Zakończ i pokaż wynik</button>
   </form>
+
+  {% if time_limit and time_limit > 0 %}
+  <script>
+    (function(){
+      var limit = parseInt('{{ time_limit|default:"0" }}');
+      if (!limit) return;
+
+      var remaining = limit;
+      var el = document.getElementById('countdown');
+      var over = document.getElementById('time_over');
+      var form = document.getElementById('quiz-form');
+
+      function fmt(sec){
+        var m = Math.floor(sec/60), s = sec%60;
+        return m + ':' + (s<10 ? '0' : '') + s;
+      }
+      function tick(){
+        if (!el) return;
+        el.textContent = fmt(remaining);
+        if (remaining <= 0){
+          over.value = '1';
+          form.submit();
+          return;
+        }
+        remaining -= 1;
+        setTimeout(tick, 1000);
+      }
+      tick();
+    })();
+  </script>
+  {% endif %}
 {% endblock %}
