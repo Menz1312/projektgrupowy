@@ -1,0 +1,26 @@
+{% extends 'base.html' %}
+{% block title %}{{ quiz.title }} – Rozwiąż{% endblock %}
+{% block content %}
+  <h1>{{ quiz.title }}</h1>
+
+  <form method="post">
+    {% csrf_token %}
+    <ol>
+      {% for q in questions %}
+        <li style="margin-bottom:1rem;">
+          <p><strong>{{ q.text }}</strong></p>
+
+          {% for ans in q.answers.all %}
+            <label style="display:block; margin:.25rem 0;">
+              <input type="checkbox" name="q_{{ q.id }}" value="{{ ans.id }}"> {{ ans.text }}
+            </label>
+          {% endfor %}
+
+          <small style="opacity:.7;">(Zaznacz poprawną odpowiedź)</small>
+        </li>
+      {% endfor %}
+    </ol>
+
+    <button type="submit" class="btn btn-primary">Zakończ i pokaż wynik</button>
+  </form>
+{% endblock %}

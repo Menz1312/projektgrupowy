@@ -1,0 +1,18 @@
+{% extends 'base.html' %}
+{% block title %}{{ quiz.title }}{% endblock %}
+{% block content %}
+  <h1>{{ quiz.title }}</h1>
+  <p>Liczba pytań: {{ quiz.questions.count }}</p>
+
+  {% if quiz.questions.count > 0 %}
+    <a class="btn btn-primary" href="{% url 'quiz-start' pk=quiz.pk %}">Rozpocznij quiz</a>
+  {% else %}
+    <p>Ten quiz nie ma jeszcze pytań.</p>
+  {% endif %}
+
+  {% if user.is_authenticated and user == quiz.author %}
+    <p style="margin-top:1rem;">
+      <a href="{% url 'quiz-edit' pk=quiz.pk %}">Edytuj quiz</a>
+    </p>
+  {% endif %}
+{% endblock %}
