@@ -1,46 +1,62 @@
 {% extends 'base.html' %}
-{% block title %}{% if is_new %}Stwórz{% else %}Edytor{% endif %} Quizu{% endblock %}
+{% block title %}{% if is_new %}Nowy quiz{% else %}Edytuj quiz{% endif %}{% endblock %}
 
 {% block content %}
-    <h1>{% if is_new %}Tworzenie Nowego Quizu{% else %}Edytor Quizu: {{ quiz.title }}{% endif %}</h1>
+  {% if not is_new and quiz %}
+    <a href="{% url 'quiz-edit' pk=quiz.pk %}">&larr; Wróć do edytora quizu</a>
+  {% else %}
+    <a href="{% url 'my-quizzes' %}">&larr; Wróć do moich quizów</a>
+  {% endif %}
 
-    <form method="post">
-        {% csrf_token %}
-        <h2>Ustawienia Główne</h2>
-        {{ quiz_form.as_p }}
-        <button type="submit" class="btn btn-primary">
-            {% if is_new %}
-                Stwórz quiz i przejdź do dodawania pytań
-            {% else %}
-                Zapisz Ustawienia
-            {% endif %}
-        </button>
-    </form>
+  <h1>
+    {% if is_new %}Utwórz nowy quiz
+    {% else %}Edytuj quiz „{{ quiz.title }}”
+    {% endif %}
+  </h1>
 
-    {# Ta sekcja pojawi się tylko w trybie edycji, gdy quiz już istnieje #}
-    {% if quiz %}
-        <hr style="margin: 2rem 0;">
+  <form method="post" novalidate>
+    {% csrf_token %}
 
-        <div style="display: flex; justify-content: space-between; align-items: center;">
-            <h2>Pytania w tym quizie</h2>
-            <a href="{% url 'question-create' quiz.pk %}" class="btn btn-primary">Dodaj Nowe Pytanie</a>
-        </div>
-
-        <div class="quiz-list" style="margin-top: 1rem;">
-        {% for question in quiz.questions.all %}
-            <div class="quiz-item">
-                <span>{{ forloop.counter }}. {{ question.text }}</span>
-                <div style="display: flex; gap: 0.5rem;">
-                    <a href="{% url 'question-edit' question.pk %}" class="btn btn-secondary">Edytuj</a>
-                    <a href="{% url 'question-delete' question.pk %}" class="btn btn-danger">Usuń</a>
-                </div>
-            </div>
-        {% empty %}
-            <p>Ten quiz nie ma jeszcze żadnych pytań.</p>
-        {% endfor %}
-        </div>
-
-        <a href="{% url 'my-quizzes' %}" class="btn btn-secondary" style="margin-top: 2rem;">Wróć do listy moich quizów</a>
+    {% if quiz_form.non_field_errors %}
+      <div class="alert alert-danger">{{ quiz_form.non_field_errors }}</div>
     {% endif %}
 
+    <div class="mb-3">
+      <label for="{{ quiz_form.title.id_for_label }}" class="form-label">Tytuł</label>
+      {{ quiz_form.title }}
+      {% for e in quiz_form.title.errors %}<div class="text-danger">{{ e }}</div>{% endfor %}
+    </div>
+
+    <div class="mb-3">
+      <label for="{{ quiz_form.visibility.id_for_label }}" class="form-label">Widoczność</label>
+      {{ quiz_form.visibility }}
+      {% for e in quiz_form.visibility.errors %}<div class="text-danger">{{ e }}</div>{% endfor %}
+    </div>
+
+    <button type="submit" class="btn btn-primary">
+      {% if is_new %}Utwórz{% else %}Zapisz{% endif %}
+    </button>
+
+    {% if not is_new and quiz %}
+      <a class="btn btn-secondary" href="{% url 'question-create' quiz_pk=quiz.pk %}">Dodaj pytanie</a>
+      <a class="btn btn-danger" href="{% url 'quiz-delete' pk=quiz.pk %}">Usuń quiz</a>
+    {% endif %}
+  </form>
+
+  {% if not is_new and quiz %}
+    <h3 style="margin-top:2rem;">Pytania</h3>
+    {% if quiz.questions.exists %}
+      <ol>
+        {% for q in quiz.questions.all %}
+          <li>
+            {{ q.text }}
+            · <a href="{% url 'question-edit' pk=q.pk %}">Edytuj</a>
+            · <a href="{% url 'question-delete' pk=q.pk %}">Usuń</a>
+          </li>
+        {% endfor %}
+      </ol>
+    {% else %}
+      <p>Brak pytań.</p>
+    {% endif %}
+  {% endif %}
 {% endblock %}

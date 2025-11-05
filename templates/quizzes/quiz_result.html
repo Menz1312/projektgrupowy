@@ -16,31 +16,44 @@
   </p>
 
   <h2>Szczegóły pytań</h2>
-  <ol>
-    {% for item in details %}
-      <li style="margin-bottom:1rem;">
-        <p><strong>{{ item.question.text }}</strong>
-          {% if item.is_correct %}
-            <span style="color:green;">— poprawnie</span>
-          {% else %}
-            <span style="color:#b00;">— niepoprawnie</span>
-          {% endif %}
-        </p>
-        <ul style="margin:.5rem 0 0 1rem;">
-          {% for ans in item.answers %}
-            <li>
-              {{ ans.text }}
-              {% if ans.id in item.correct_ids %}<em>(poprawna)</em>{% endif %}
-              {% if ans.id in item.chosen_ids and not ans.id in item.correct_ids %}
-                <em style="color:#b00;">(zaznaczona błędnie)</em>
-              {% endif %}
-              {% if ans.id in item.correct_ids and not ans.id in item.chosen_ids %}
-                <em style="opacity:.7;">(powinna być zaznaczona)</em>
-              {% endif %}
-            </li>
-          {% endfor %}
-        </ul>
-      </li>
-    {% endfor %}
-  </ol>
+<ol>
+  {% for item in details %}
+    <li style="margin-bottom:1rem;">
+      <p><strong>{{ item.question.text }}</strong>
+        {% if item.is_correct %}
+          <span style="color:green;">— poprawnie</span>
+        {% else %}
+          <span style="color:#b00;">— niepoprawnie</span>
+        {% endif %}
+      </p>
+
+      <ul style="margin:.5rem 0 0 1rem;">
+        {% for ans in item.answers %}
+          <li>
+            {{ ans.text }}
+            {% if ans.id in item.correct_ids %}<em>(poprawna)</em>{% endif %}
+            {% if ans.id in item.chosen_ids and not ans.id in item.correct_ids %}
+              <em style="color:#b00;">(zaznaczona błędnie)</em>
+            {% endif %}
+            {% if ans.id in item.correct_ids and not ans.id in item.chosen_ids %}
+              <em style="opacity:.7;">(powinna być zaznaczona)</em>
+            {% endif %}
+          </li>
+        {% endfor %}
+      </ul>
+
+      {% if item.question.explanation %}
+        <details style="margin-top:.5rem;">
+          <summary style="cursor:pointer;">Pokaż objaśnienie</summary>
+          <div style="margin-top:.5rem; opacity:.9;">
+            {{ item.question.explanation|linebreaksbr }}
+          </div>
+        </details>
+      {% endif %}
+    </li>
+  {% endfor %}
+</ol>
+
 {% endblock %}
+
+
