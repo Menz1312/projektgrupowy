@@ -3,7 +3,7 @@ from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from .models import Quiz, Question, Answer
 from .forms import QuizForm, QuestionForm, AnswerFormSet
-import os, json, openai
+import os, json
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -168,3 +168,52 @@ def quiz_delete_view(request, pk):
         messages.success(request, "Quiz został usunięty.")
         return redirect('my-quizzes')
     return render(request, 'quizzes/quiz_confirm_delete.html', {'quiz': quiz})
+
+
+def _can_view_quiz(user, quiz):
+    # publiczny albo autor
+    return quiz.visibility == 'PUBLIC' or (user.is_authenticated and quiz.author == user)
+
+def quiz_take_view(request, pk):
+    quiz = get_object_or_404(Quiz, pk=pk)
+
+    if not _can_view_quiz(request.user, quiz):
+        messages.error(request, "Nie masz uprawnień do wyświetlenia tego quizu.")
+        return redirect('home')
+
+    if quiz.questions.count() == 0:
+        messages.info(request, "Ten quiz nie ma jeszcze pytań.")
+        return redirect('quiz-detail', pk=quiz.pk)
+
+    if request.method == 'POST':
+        total = quiz.questions.count()
+        correct_count = 0
+        details = []
+
+        for question in quiz.questions.prefetch_related('answers'):
+            field = f"q_{question.id}"
+            chosen_ids = set(map(int, request.POST.getlist(field)))
+            correct_ids = set(question.answers.filter(is_correct=True).values_list('id', flat=True))
+            is_correct = (chosen_ids == correct_ids) and len(chosen_ids) > 0
+            if is_correct:
+                correct_count += 1
+            details.append({
+                'question': question,
+                'answers': list(question.answers.all()),
+                'chosen_ids': chosen_ids,
+                'correct_ids': correct_ids,
+                'is_correct': is_correct,
+            })
+
+        score_percent = round((correct_count / total) * 100)
+        return render(request, 'quizzes/quiz_result.html', {
+            'quiz': quiz,
+            'total': total,
+            'correct_count': correct_count,
+            'score_percent': score_percent,
+            'details': details,
+        })
+
+    # GET -> start/rozwiązywanie
+    questions = quiz.questions.prefetch_related('answers').all()
+    return render(request, 'quizzes/quiz_take.html', {'quiz': quiz, 'questions': questions})
