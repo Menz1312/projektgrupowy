@@ -5,7 +5,7 @@
   <p>Liczba pytań: {{ quiz.questions.count }}</p>
 
   {% if quiz.questions.count > 0 %}
-    <a class="btn btn-primary" href="{% url 'quiz-start' pk=quiz.pk %}">Rozpocznij quiz</a>
+    <a class="btn btn-primary" href="{% url 'quiz-start' pk=quiz.pk %}?t=120">Rozpocznij (2 min)</a>
   {% else %}
     <p>Ten quiz nie ma jeszcze pytań.</p>
   {% endif %}

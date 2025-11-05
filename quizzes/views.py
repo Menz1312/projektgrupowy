@@ -5,6 +5,8 @@ from .models import Quiz, Question, Answer
 from .forms import QuizForm, QuestionForm, AnswerFormSet
 import os, json
 from dotenv import load_dotenv
+import random
+
 
 load_dotenv()
 
@@ -184,6 +186,17 @@ def quiz_take_view(request, pk):
     if quiz.questions.count() == 0:
         messages.info(request, "Ten quiz nie ma jeszcze pytań.")
         return redirect('quiz-detail', pk=quiz.pk)
+    
+ # ── LIMIT CZASU (sekundy) z query param: ?t=90, ?t=300, itp.
+    try:
+        time_limit = int(request.GET.get('t', '0'))
+    except ValueError:
+        time_limit = 0
+    time_limit = max(0, time_limit)
+
+
+#------------------------------------------
+
 
     if request.method == 'POST':
         total = quiz.questions.count()
@@ -214,6 +227,17 @@ def quiz_take_view(request, pk):
             'details': details,
         })
 
-    # GET -> start/rozwiązywanie
-    questions = quiz.questions.prefetch_related('answers').all()
-    return render(request, 'quizzes/quiz_take.html', {'quiz': quiz, 'questions': questions})
+    # GET -> rozwiązywanie
+    # ── LOSOWA KOLEJNOŚĆ ODPOWIEDZI: tasujemy w Pythonie, stabilne niezależnie od POSTa (bo wysyłamy ID).
+    questions_data = []
+    for q in quiz.questions.prefetch_related('answers'):
+        answers = list(q.answers.all())
+        random.shuffle(answers)
+        questions_data.append({'q': q, 'answers': answers})
+
+    return render(request, 'quizzes/quiz_take.html', {
+        'quiz': quiz,
+        'questions_data': questions_data,
+        'time_limit': time_limit,
+    })
+#-------------------------------------
