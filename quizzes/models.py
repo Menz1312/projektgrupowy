@@ -11,9 +11,9 @@ class Quiz(models.Model):
     def __str__(self): return self.title
 
 class Question(models.Model):
-    quiz = models.ForeignKey(Quiz, on_delete=models.CASCADE, related_name='questions')
-    text = models.CharField(max_length=500)
-    def __str__(self): return self.text
+    quiz = models.ForeignKey(Quiz, related_name='questions', on_delete=models.CASCADE)
+    text = models.TextField()
+    explanation = models.TextField(blank=True, default="")  # 🔹 NOWE
 
 class Answer(models.Model):
     question = models.ForeignKey(Question, on_delete=models.CASCADE, related_name='answers')

@@ -14,12 +14,17 @@ class QuizForm(forms.ModelForm):
 class QuestionForm(forms.ModelForm):
     class Meta:
         model = Question
-        fields = ['text']
-        labels = {
-            'text': 'Treść pytania'
-        }
+        fields = ['text', 'explanation']  # 🔹 dodane explanation
         widgets = {
-            'text': forms.Textarea(attrs={'rows': 3, 'placeholder': 'Wpisz treść pytania...'}),
+            'text': forms.Textarea(attrs={'rows': 3}),
+            'explanation': forms.Textarea(attrs={
+                'rows': 3,
+                'placeholder': 'Opcjonalnie: wytłumacz poprawną odpowiedź / dodaj źródło'
+            }),
+        }
+        labels = {
+            'text': 'Treść pytania',
+            'explanation': 'Objaśnienie (opcjonalnie)',
         }
 
 AnswerFormSet = inlineformset_factory(
