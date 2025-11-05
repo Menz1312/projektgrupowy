@@ -3,9 +3,9 @@
 
 {% block content %}
   {% if not is_new and quiz %}
-    <a href="{% url 'quiz-edit' pk=quiz.pk %}">&larr; Wróć do edytora quizu</a>
-  {% else %}
     <a href="{% url 'my-quizzes' %}">&larr; Wróć do moich quizów</a>
+  {% else %}
+    <a href="{% url 'quiz-edit' pk=quiz.pk %}">&larr; Wróć do edytora quizu</a>
   {% endif %}
 
   <h1>
@@ -60,3 +60,4 @@
     {% endif %}
   {% endif %}
 {% endblock %}
+
