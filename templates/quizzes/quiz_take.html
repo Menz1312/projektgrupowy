@@ -20,12 +20,20 @@
 
           {% for ans in item.answers %}
             <label style="display:block; margin:.25rem 0;">
-              <input type="checkbox" name="q_{{ item.q.id }}" value="{{ ans.id }}"> {{ ans.text }}
+              {% if item.q.question_type == 'SINGLE' %}
+                <input type="radio" name="q_{{ item.q.id }}" value="{{ ans.id }}"> {{ ans.text }}
+              {% else %}
+                <input type="checkbox" name="q_{{ item.q.id }}" value="{{ ans.id }}"> {{ ans.text }}
+              {% endif %}
             </label>
           {% endfor %}
 
-          <small style="opacity:.7;">(Zaznacz poprawną odpowiedź)</small>
-        </li>
+          {% if item.q.question_type == 'SINGLE' %}
+            <small style="opacity:.7;">(Zaznacz jedną poprawną odpowiedź)</small>
+          {% else %}
+            <small style="opacity:.7;">(Zaznacz wszystkie poprawne odpowiedzi)</small>
+          {% endif %}
+          </li>
       {% endfor %}
     </ol>
 

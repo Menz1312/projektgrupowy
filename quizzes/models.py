@@ -1,3 +1,4 @@
+# quizzes/models.py
 from django.db import models
 from django.conf import settings
 
@@ -11,9 +12,22 @@ class Quiz(models.Model):
     def __str__(self): return self.title
 
 class Question(models.Model):
+    # 🔽 NOWE POLA: Definicja typów pytań
+    class QuestionType(models.TextChoices):
+        SINGLE = 'SINGLE', 'Jednokrotny wybór'
+        MULTIPLE = 'MULTIPLE', 'Wielokrotny wybór'
+
     quiz = models.ForeignKey(Quiz, related_name='questions', on_delete=models.CASCADE)
     text = models.TextField()
-    explanation = models.TextField(blank=True, default="")  # 🔹 NOWE
+    explanation = models.TextField(blank=True, default="")
+    
+    # 🔽 NOWE POLE: przechowuje typ pytania, domyślnie jednokrotny wybór
+    question_type = models.CharField(
+        max_length=10,
+        choices=QuestionType.choices,
+        default=QuestionType.SINGLE
+    )
+    # 🔼 KONIEC NOWEGO POLA
 
 class Answer(models.Model):
     question = models.ForeignKey(Question, on_delete=models.CASCADE, related_name='answers')
