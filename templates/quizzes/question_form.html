@@ -11,8 +11,12 @@
         {{ question_form.as_p }}
 
         <h3 style="margin-top: 2rem;">Odpowiedzi</h3>
-        <p>Zaznacz pole przy poprawnej odpowiedzi. Musisz podać treść dla wszystkich 4 odpowiedzi.</p>
-
+        <p>
+          Zaznacz pole przy poprawnej odpowiedzi (lub odpowiedziach).<br>
+          <b>Pytanie jednokrotnego wyboru</b> musi mieć dokładnie 1 poprawną odpowiedź.<br>
+          <b>Pytanie wielokrotnego wyboru</b> musi mieć co najmniej 1 poprawną odpowiedź.<br>
+          Musisz podać treść dla wszystkich 4 odpowiedzi.
+        </p>
         {{ answer_formset.management_form }}
         {% for form in answer_formset %}
             <div class="formset-row" style="background: #f8f9fa;">
