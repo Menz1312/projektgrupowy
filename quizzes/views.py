@@ -12,6 +12,7 @@ from django.utils.text import slugify
 from django.db import transaction
 from django.core.exceptions import ValidationError
 from django.views.decorators.http import require_POST
+import openai # Upewnij się, że ten import jest dodany
 
 load_dotenv()
 
@@ -222,18 +223,17 @@ def quiz_take_view(request, pk):
         messages.info(request, "Ten quiz nie ma jeszcze pytań.")
         return redirect('quiz-detail', pk=quiz.pk)
     
-    try:
-        time_limit = int(request.GET.get('t', '0'))
-    except ValueError:
-        time_limit = 0
-    time_limit = max(0, time_limit)
+    # --- ZMODYFIKOWANA LOGIKA LIMITU CZASU ---
+    # Pobieramy z modelu (w minutach) i przeliczamy na sekundy
+    time_limit_seconds = quiz.time_limit * 60
+    # ----------------------------------------
 
     if request.method == 'POST':
         total = quiz.questions.count()
         correct_count = 0
         details = []
 
-        # Używamy prefetch_related('answers') dla wydajności
+        # (Logika oceniania POST - bez zmian)
         for question in quiz.questions.prefetch_related('answers'):
             field = f"q_{question.id}"
             correct_ids = set(question.answers.filter(is_correct=True).values_list('id', flat=True))
@@ -241,31 +241,27 @@ def quiz_take_view(request, pk):
             chosen_ids = set()
             
             if question.question_type == Question.QuestionType.SINGLE:
-                # Dla pytań jednokrotnych, używamy .get()
                 chosen_id_str = request.POST.get(field)
                 if chosen_id_str:
                     try:
                         chosen_ids.add(int(chosen_id_str))
                     except ValueError:
-                        pass # Zignoruj niepoprawną wartość
+                        pass 
             else:
-                # Dla pytań wielokrotnych, używamy .getlist()
                 chosen_id_strs = request.POST.getlist(field)
-                # Używamy pętli z try-except zamiast map(int, ...) aby być odpornym na błędy
                 for id_str in chosen_id_strs:
                     try:
                         chosen_ids.add(int(id_str))
                     except ValueError:
-                        pass # Zignoruj niepoprawne wartości
+                        pass 
             
-            # Logika sprawdzania poprawności pozostaje taka sama
             is_correct = (chosen_ids == correct_ids) and len(chosen_ids) > 0
             if is_correct:
                 correct_count += 1
                 
             details.append({
                 'question': question,
-                'answers': list(question.answers.all()), # Odpowiedzi już są w pamięci dzięki prefetch
+                'answers': list(question.answers.all()),
                 'chosen_ids': chosen_ids,
                 'correct_ids': correct_ids,
                 'is_correct': is_correct,
@@ -278,7 +274,7 @@ def quiz_take_view(request, pk):
             'correct_count': correct_count,
             'score_percent': score_percent,
             'details': details,
-            'time_over': request.POST.get('time_over') == '1' # Przekazujemy info o czasie
+            'time_over': request.POST.get('time_over') == '1'
         })
 
     # GET -> rozwiązywanie (bez zmian)
@@ -291,7 +287,7 @@ def quiz_take_view(request, pk):
     return render(request, 'quizzes/quiz_take.html', {
         'quiz': quiz,
         'questions_data': questions_data,
-        'time_limit': time_limit,
+        'time_limit': time_limit_seconds, # Przekazujemy przeliczoną wartość
     })
 
 @login_required
