@@ -11,10 +11,8 @@
 
   <p style="margin:1rem 0;">
     <a href="{% url 'quiz-start' pk=quiz.pk %}">Rozwiąż ponownie</a> |
-    <a href="{% url 'quiz-start' pk=quiz.pk %}?t=120">Rozwiąż ponownie (2 min)</a> |
     <a href="{% url 'quiz-detail' pk=quiz.pk %}">Wróć do szczegółów</a>
   </p>
-
   <h2>Szczegóły pytań</h2>
 <ol>
   {% for item in details %}
@@ -55,5 +53,3 @@
 </ol>
 
 {% endblock %}
-
-

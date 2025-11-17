@@ -4,12 +4,17 @@
   <h1>{{ quiz.title }}</h1>
   <p>Liczba pytań: {{ quiz.questions.count }}</p>
 
+  {% if quiz.time_limit > 0 %}
+    <p><strong>Limit czasu:</strong> {{ quiz.time_limit }} minut.</p>
+  {% else %}
+    <p><strong>Limit czasu:</strong> Brak.</p>
+  {% endif %}
+
   {% if quiz.questions.count > 0 %}
-    <a class="btn btn-primary" href="{% url 'quiz-start' pk=quiz.pk %}?t=120">Rozpocznij (2 min)</a>
+    <a class="btn btn-primary" href="{% url 'quiz-start' pk=quiz.pk %}">Rozpocznij</a>
   {% else %}
     <p>Ten quiz nie ma jeszcze pytań.</p>
   {% endif %}
-
   {% if user.is_authenticated and user == quiz.author %}
     <p style="margin-top:1rem;">
       <a href="{% url 'quiz-edit' pk=quiz.pk %}">Edytuj quiz</a>

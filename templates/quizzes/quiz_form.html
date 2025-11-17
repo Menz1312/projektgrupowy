@@ -31,6 +31,12 @@
       {% for e in quiz_form.visibility.errors %}<div class="text-danger">{{ e }}</div>{% endfor %}
     </div>
 
+    <div class="mb-3">
+      <label for="{{ quiz_form.time_limit.id_for_label }}" class="form-label">{{ quiz_form.time_limit.label }}</label>
+      {{ quiz_form.time_limit }}
+      <small style="display: block; opacity: 0.7;">{{ quiz_form.time_limit.help_text }}</small>
+      {% for e in quiz_form.time_limit.errors %}<div class="text-danger">{{ e }}</div>{% endfor %}
+    </div>
     <button type="submit" class="btn btn-primary">
       {% if is_new %}Utwórz i przejdź do dodawania pytań{% else %}Zapisz zmiany w quizie{% endif %}
     </button>

@@ -1,3 +1,4 @@
+# quizzes/forms.py
 from django import forms
 from .models import Quiz, Question, Answer
 from django.forms import inlineformset_factory
@@ -5,13 +6,20 @@ from django.forms import inlineformset_factory
 class QuizForm(forms.ModelForm):
     class Meta:
         model = Quiz
-        fields = ['title', 'visibility']
+        # --- ZMODYFIKOWANE POLA ---
+        fields = ['title', 'visibility', 'time_limit']
         labels = {
             'title': 'Tytuł Quizu',
-            'visibility': 'Widoczność'
+            'visibility': 'Widoczność',
+            # 'time_limit' użyje verbose_name z modelu
+        }
+        # --- NOWY WIDGET ---
+        widgets = {
+            'time_limit': forms.NumberInput(attrs={'min': 0, 'step': 1})
         }
 
 class QuestionForm(forms.ModelForm):
+    # (reszta formularza QuestionForm bez zmian)
     class Meta:
         model = Question
         fields = ['text', 'explanation', 'question_type']
@@ -29,23 +37,15 @@ class QuestionForm(forms.ModelForm):
             'question_type': 'Typ pytania',
         }
 
+# (AnswerFormSet bez zmian)
 AnswerFormSet = inlineformset_factory(
     Question,
     Answer,
     fields=('text', 'is_correct'),
-    
-    # 1. Pokaż domyślnie 2 formularze (zamiast 4)
     extra=2, 
-    
-    # 2. Ustaw maksymalną liczbę na 10
     max_num=10, 
-    
-    # 3. Wymagaj co najmniej 2 odpowiedzi
     min_num=2, 
-    
-    # 4. Włącz możliwość usuwania
     can_delete=True, 
-    
     labels={
         'text': 'Treść odpowiedzi',
         'is_correct': 'Czy ta odpowiedź jest poprawna?'

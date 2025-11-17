@@ -9,10 +9,15 @@ class Quiz(models.Model):
     title = models.CharField(max_length=255)
     author = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     visibility = models.CharField(max_length=10, choices=Visibility.choices, default=Visibility.PRIVATE)
+    time_limit = models.IntegerField(
+        default=0, 
+        verbose_name="Limit czasu (w minutach)",
+        help_text="Ustaw 0, aby wyłączyć limit czasu."
+    )
     def __str__(self): return self.title
 
 class Question(models.Model):
-    # 🔽 NOWE POLA: Definicja typów pytań
+    
     class QuestionType(models.TextChoices):
         SINGLE = 'SINGLE', 'Jednokrotny wybór'
         MULTIPLE = 'MULTIPLE', 'Wielokrotny wybór'
@@ -21,13 +26,13 @@ class Question(models.Model):
     text = models.TextField()
     explanation = models.TextField(blank=True, default="")
     
-    # 🔽 NOWE POLE: przechowuje typ pytania, domyślnie jednokrotny wybór
+    
     question_type = models.CharField(
         max_length=10,
         choices=QuestionType.choices,
         default=QuestionType.SINGLE
     )
-    # 🔼 KONIEC NOWEGO POLA
+    
 
 class Answer(models.Model):
     question = models.ForeignKey(Question, on_delete=models.CASCADE, related_name='answers')
