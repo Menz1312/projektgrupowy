@@ -32,17 +32,35 @@
     </div>
 
     <button type="submit" class="btn btn-primary">
-      {% if is_new %}Utwórz{% else %}Zapisz{% endif %}
+      {% if is_new %}Utwórz i przejdź do dodawania pytań{% else %}Zapisz zmiany w quizie{% endif %}
     </button>
 
     {% if not is_new and quiz %}
-      <a class="btn btn-secondary" href="{% url 'question-create' quiz_pk=quiz.pk %}">Dodaj pytanie</a>
+      <a class="btn btn-secondary" href="{% url 'question-create' quiz_pk=quiz.pk %}">Dodaj pytanie ręcznie</a>
       <a class="btn btn-danger" href="{% url 'quiz-delete' pk=quiz.pk %}">Usuń quiz</a>
     {% endif %}
   </form>
 
   {% if not is_new and quiz %}
-    <h3 style="margin-top:2rem;">Pytania</h3>
+    
+    <div style="border: 1px solid var(--border); padding: 1rem; margin-top: 2rem; border-radius: 8px;">
+        <h3>Import / Export Pytań (JSON)</h3>
+        <p>Możesz zaimportować pytania z pliku JSON lub wyeksportować istniejące.</p>
+        
+        <form action="{% url 'quiz-import-json' pk=quiz.pk %}" method="post" enctype="multipart/form-data" style="margin-bottom: 1rem; padding-top: 1rem; border-top: 1px solid var(--border);">
+            {% csrf_token %}
+            <label for="json_file_input" class="form-label" style="font-weight: bold;">Importuj pytania z pliku JSON:</label>
+            <div style="display: flex; gap: 0.5rem; align-items: center;">
+                <input type="file" name="json_file" id="json_file_input" accept=".json" required class="form-control" style="width: auto;">
+                <button type="submit" class="btn btn-primary">Importuj</button>
+            </div>
+        </form>
+        
+        <div style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border);">
+            <a href="{% url 'quiz-export-json' pk=quiz.pk %}" class="btn btn-secondary">Eksportuj wszystkie pytania do JSON</a>
+        </div>
+    </div>
+    <h3 style="margin-top:2rem;">Pytania w quizie</h3>
     {% if quiz.questions.exists %}
       <ol>
         {% for q in quiz.questions.all %}
@@ -54,9 +72,8 @@
         {% endfor %}
       </ol>
     {% else %}
-      <p>Brak pytań.</p>
+      <p>Brak pytań. Dodaj je ręcznie, wygeneruj (jeśli dostępne) lub zaimportuj z pliku JSON.</p>
     {% endif %}
+    
   {% endif %}
 {% endblock %}
-
-

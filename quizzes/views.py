@@ -7,7 +7,11 @@ from .forms import QuizForm, QuestionForm, AnswerFormSet
 import os, json
 from dotenv import load_dotenv
 import random
-
+from django.http import HttpResponse
+from django.utils.text import slugify
+from django.db import transaction
+from django.core.exceptions import ValidationError
+from django.views.decorators.http import require_POST
 
 load_dotenv()
 
@@ -100,8 +104,6 @@ def quiz_edit_view(request, pk):
     
     return render(request, 'quizzes/quiz_form.html', {'quiz_form': form, 'quiz': quiz})
 
-
-# 🔽 ZAKTUALIZOWANY WIDOK (Walidacja)
 @login_required
 def question_create_view(request, quiz_pk):
     quiz = get_object_or_404(Quiz, pk=quiz_pk, author=request.user)
@@ -133,7 +135,6 @@ def question_create_view(request, quiz_pk):
                 answer_formset.save()
                 messages.success(request, "Nowe pytanie zostało dodane.")
                 return redirect('quiz-edit', pk=quiz.pk)
-            # 🔼 KONIEC NOWEJ LOGIKI
     else:
         question_form = QuestionForm()
         answer_formset = AnswerFormSet()
@@ -145,7 +146,6 @@ def question_create_view(request, quiz_pk):
     }
     return render(request, 'quizzes/question_form.html', context)
 
-# 🔽 ZAKTUALIZOWANY WIDOK (Walidacja)
 @login_required
 def question_edit_view(request, pk):
     question = get_object_or_404(Question, pk=pk, quiz__author=request.user)
@@ -172,7 +172,6 @@ def question_edit_view(request, pk):
                 answer_formset.save()
                 messages.success(request, "Pytanie zostało zaktualizowane.")
                 return redirect('quiz-edit', pk=question.quiz.pk)
-            # 🔼 KONIEC NOWEJ LOGIKI
     else:
         question_form = QuestionForm(instance=question)
         answer_formset = AnswerFormSet(instance=question)
@@ -234,7 +233,6 @@ def quiz_take_view(request, pk):
         correct_count = 0
         details = []
 
-        # 🔽 ZMIENIONA LOGIKA OCENIANIA
         # Używamy prefetch_related('answers') dla wydajności
         for question in quiz.questions.prefetch_related('answers'):
             field = f"q_{question.id}"
@@ -272,7 +270,6 @@ def quiz_take_view(request, pk):
                 'correct_ids': correct_ids,
                 'is_correct': is_correct,
             })
-        # 🔼 KONIEC ZMIENIONEJ LOGIKI
 
         score_percent = round((correct_count / total) * 100)
         return render(request, 'quizzes/quiz_result.html', {
@@ -296,3 +293,162 @@ def quiz_take_view(request, pk):
         'questions_data': questions_data,
         'time_limit': time_limit,
     })
+
+@login_required
+def quiz_export_json_view(request, pk):
+    """
+    Eksportuje wszystkie pytania i odpowiedzi dla danego quizu do pliku JSON.
+    """
+    quiz = get_object_or_404(Quiz, pk=pk, author=request.user)
+    
+    questions_data = []
+    
+    # Używamy prefetch_related dla optymalizacji zapytań
+    for q in quiz.questions.prefetch_related('answers'):
+        answers_data = [
+            {'text': ans.text, 'is_correct': ans.is_correct}
+            for ans in q.answers.all()
+        ]
+        
+        questions_data.append({
+            'text': q.text,
+            'explanation': q.explanation,
+            'question_type': q.question_type,
+            'answers': answers_data
+        })
+        
+    json_data = {
+        'title': quiz.title,
+        'questions': questions_data
+    }
+    
+    # Przygotowanie odpowiedzi HTTP z plikiem JSON
+    response = HttpResponse(
+        json.dumps(json_data, indent=4, ensure_ascii=False),
+        content_type='application/json; charset=utf-8'
+    )
+    
+    # Tworzenie bezpiecznej nazwy pliku
+    safe_title = slugify(quiz.title)
+    if not safe_title:
+        safe_title = 'quiz'
+        
+    response['Content-Disposition'] = f'attachment; filename="quiz_{quiz.pk}_{safe_title}.json"'
+    return response
+
+
+@login_required
+@require_POST # Ten widok powinien przyjmować tylko metodę POST
+@transaction.atomic # Używamy transakcji, aby w razie błędu nic się nie zapisało
+def quiz_import_json_view(request, pk):
+    """
+    Importuje pytania z pliku JSON i dodaje je do quizu.
+    Wykonuje pełną walidację pliku przed zapisem.
+    """
+    quiz = get_object_or_404(Quiz, pk=pk, author=request.user)
+    
+    if 'json_file' not in request.FILES:
+        messages.error(request, "Nie wybrano pliku.")
+        return redirect('quiz-edit', pk=quiz.pk)
+
+    file = request.FILES['json_file']
+
+    if not file.name.endswith('.json'):
+        messages.error(request, "Plik musi być w formacie .json.")
+        return redirect('quiz-edit', pk=quiz.pk)
+
+    try:
+        # Dekodujemy plik ręcznie, aby mieć pewność kodowania UTF-8
+        try:
+            file_content = file.read().decode('utf-8')
+            data = json.loads(file_content)
+        except UnicodeDecodeError:
+            raise ValidationError("Plik ma niepoprawne kodowanie. Wymagane jest UTF-8.")
+        except json.JSONDecodeError:
+            raise ValidationError("Błąd parsowania pliku JSON. Upewnij się, że plik jest poprawny.")
+
+        if 'questions' not in data or not isinstance(data['questions'], list):
+            raise ValidationError("Plik JSON musi zawierać klucz 'questions' z listą pytań.")
+
+        questions_to_create = [] # Przechowujemy dane do walidacji
+
+        for i, q_data in enumerate(data['questions']):
+            q_num = i + 1
+            
+            # 1. Walidacja struktury pytania
+            if not isinstance(q_data, dict):
+                raise ValidationError(f"Pytanie {q_num}: Nie jest poprawnym obiektem JSON.")
+                
+            text = q_data.get('text')
+            if not text or not isinstance(text, str):
+                raise ValidationError(f"Pytanie {q_num}: Brak lub niepoprawny klucz 'text'.")
+
+            question_type = q_data.get('question_type', Question.QuestionType.SINGLE)
+            if question_type not in Question.QuestionType.values:
+                raise ValidationError(f"Pytanie {q_num}: Niepoprawna wartość 'question_type'. Musi być 'SINGLE' lub 'MULTIPLE'.")
+            
+            explanation = q_data.get('explanation', '')
+            answers_data = q_data.get('answers')
+            
+            # 2. Walidacja struktury odpowiedzi
+            if not answers_data or not isinstance(answers_data, list) or len(answers_data) < 2:
+                 raise ValidationError(f"Pytanie {q_num} ('{text[:20]}...'): Musi zawierać listę 'answers' z co najmniej 2 odpowiedziami.")
+
+            correct_count = 0
+            validated_answers = []
+            
+            for j, ans_data in enumerate(answers_data):
+                ans_num = j + 1
+                if not isinstance(ans_data, dict):
+                     raise ValidationError(f"Pytanie {q_num}, Odpowiedź {ans_num}: Nie jest poprawnym obiektem JSON.")
+                
+                ans_text = ans_data.get('text')
+                is_correct = ans_data.get('is_correct')
+                
+                if not ans_text or not isinstance(ans_text, str) or not isinstance(is_correct, bool):
+                    raise ValidationError(f"Pytanie {q_num}, Odpowiedź {ans_num}: Niepoprawna struktura (wymagane 'text' (str) i 'is_correct' (bool)).")
+                
+                if is_correct:
+                    correct_count += 1
+                validated_answers.append({'text': ans_text, 'is_correct': is_correct})
+            
+            # 3. Walidacja logiki (zgodnie z question_create_view)
+            if question_type == Question.QuestionType.SINGLE and correct_count != 1:
+                raise ValidationError(f"Pytanie {q_num} (Jednokrotny): Musi mieć dokładnie 1 poprawną odpowiedź (znaleziono {correct_count}).")
+            if question_type == Question.QuestionType.MULTIPLE and correct_count == 0:
+                raise ValidationError(f"Pytanie {q_num} (Wielokrotny): Musi mieć przynajmniej 1 poprawną odpowiedź.")
+            
+            # Jeśli wszystko OK, dodajemy do listy do utworzenia
+            questions_to_create.append({
+                'q_obj': Question(quiz=quiz, text=text, explanation=explanation, question_type=question_type),
+                'answers': validated_answers
+            })
+
+        # --- ZAPIS DO BAZY ---
+        # Jeśli pętla przeszła bez błędów, zapisujemy wszystko (w ramach transakcji)
+        
+        num_created = len(questions_to_create)
+        
+        for q_batch in questions_to_create:
+            q = q_batch['q_obj']
+            q.save() # Zapisujemy pytanie, aby dostać ID
+            
+            # Tworzymy odpowiedzi powiązane z tym pytaniem
+            answers_to_save = [
+                Answer(question=q, text=ans_data['text'], is_correct=ans_data['is_correct'])
+                for ans_data in q_batch['answers']
+            ]
+            Answer.objects.bulk_create(answers_to_save)
+        
+        messages.success(request, f"Pomyślnie zaimportowano {num_created} pytań.")
+
+    except ValidationError as e:
+        # Jawny błąd walidacji
+        messages.error(request, f"Błąd walidacji: {e.message}")
+        # Transakcja zostanie automatycznie wycofana
+    except Exception as e:
+        # Inne błędy (np. I/O)
+        messages.error(request, f"Wystąpił nieoczekiwany błąd: {e}")
+        # Transakcja zostanie automatycznie wycofana
+
+    return redirect('quiz-edit', pk=quiz.pk)
