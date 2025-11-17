@@ -20,4 +20,16 @@
             <p>Nie masz jeszcze żadnych quizów.</p>
         {% endfor %}
     </div>
-{% endblock %}
+
+    <h2 style="margin-top: 2rem;">Quizy udostępnione Tobie:</h2>
+    <div class="quiz-list">
+        {% for quiz in shared_quizzes %}
+            <div class="quiz-item">
+                <a href="{% url 'quiz-detail' quiz.pk %}">{{ quiz.title }}</a>
+                <span>(Autor: {{ quiz.author.username }})</span>
+            </div>
+        {% empty %}
+            <p>Nikt jeszcze nie udostępnił Ci żadnego quizu.</p>
+        {% endfor %}
+    </div>
+    {% endblock %}
