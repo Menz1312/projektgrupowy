@@ -2,24 +2,37 @@
 from django import forms
 from .models import Quiz, Question, Answer
 from django.forms import inlineformset_factory
+from django.contrib.auth import get_user_model # <-- NOWY IMPORT
+
+User = get_user_model() # <-- Pobranie modelu użytkownika
 
 class QuizForm(forms.ModelForm):
+    # --- NOWE POLE FORMULARZA ---
+    # Definiujemy je jawnie, aby dostosować widget i queryset
+    shared_with = forms.ModelMultipleChoiceField(
+        queryset=User.objects.none(), # Zaczynamy od pustego QuerySet, widok je ustawi
+        widget=forms.CheckboxSelectMultiple,
+        required=False,
+        label="Udostępnij użytkownikom"
+    )
+    # --------------------------
+
     class Meta:
         model = Quiz
         # --- ZMODYFIKOWANE POLA ---
-        fields = ['title', 'visibility', 'time_limit']
+        fields = ['title', 'visibility', 'time_limit', 'shared_with']
         labels = {
             'title': 'Tytuł Quizu',
             'visibility': 'Widoczność',
-            # 'time_limit' użyje verbose_name z modelu
+            # 'time_limit' i 'shared_with' użyją etykiet z definicji
         }
-        # --- NOWY WIDGET ---
         widgets = {
-            'time_limit': forms.NumberInput(attrs={'min': 0, 'step': 1})
+            'time_limit': forms.NumberInput(attrs={'min': 0, 'step': 1}),
+            'visibility': forms.RadioSelect, # Lepsze niż <select>
         }
 
+# (Reszta pliku - QuestionForm i AnswerFormSet - bez zmian)
 class QuestionForm(forms.ModelForm):
-    # (reszta formularza QuestionForm bez zmian)
     class Meta:
         model = Question
         fields = ['text', 'explanation', 'question_type']
@@ -37,15 +50,16 @@ class QuestionForm(forms.ModelForm):
             'question_type': 'Typ pytania',
         }
 
-# (AnswerFormSet bez zmian)
 AnswerFormSet = inlineformset_factory(
     Question,
     Answer,
     fields=('text', 'is_correct'),
+    
     extra=2, 
     max_num=10, 
     min_num=2, 
     can_delete=True, 
+    
     labels={
         'text': 'Treść odpowiedzi',
         'is_correct': 'Czy ta odpowiedź jest poprawna?'

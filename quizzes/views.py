@@ -12,25 +12,29 @@ from django.utils.text import slugify
 from django.db import transaction
 from django.core.exceptions import ValidationError
 from django.views.decorators.http import require_POST
-import openai # Upewnij się, że ten import jest dodany
+import openai
+from django.contrib.auth import get_user_model # <-- NOWY IMPORT
 
 load_dotenv()
+User = get_user_model() # <-- Pobranie modelu użytkownika
 
-# Widoki home_view i quiz_detail_view pozostają bez zmian
+# Widok home_view pozostaje bez zmian
 def home_view(request):
     query = request.GET.get('q', '')
     quizzes = Quiz.objects.filter(visibility='PUBLIC', title__icontains=query)
     return render(request, 'home.html', {'quizzes': quizzes})
 
+# Widok quiz_detail_view pozostaje bez zmian
 def quiz_detail_view(request, pk):
     quiz = get_object_or_404(Quiz, pk=pk)
-    is_author = request.user.is_authenticated and quiz.author == request.user
-    if quiz.visibility == 'PUBLIC' or is_author:
+    # Logika uprawnień jest teraz w _can_view_quiz
+    if _can_view_quiz(request.user, quiz):
         return render(request, 'quizzes/quiz_detail.html', {'quiz': quiz})
+    
     messages.error(request, "Nie masz uprawnień do wyświetlenia tego quizu.")
     return redirect('home')
 
-# Widok my_quizzes_view pozostaje bez zmian
+# Widok my_quizzes_view zaktualizowany o listę udostępnionych
 @login_required
 def my_quizzes_view(request):
     if request.method == 'POST':
@@ -72,39 +76,62 @@ def my_quizzes_view(request):
             messages.error(request, f"Wystąpił błąd podczas generowania quizu: {e}")
         return redirect('my-quizzes')
     
+    # --- ZMODYFIKOWANA LOGIKA POBIERANIA QUIZÓW ---
     quizzes = Quiz.objects.filter(author=request.user)
-    return render(request, 'quizzes/my_quizzes.html', {'quizzes': quizzes})
+    # Używamy related_name 'shared_quizzes' zdefiniowanego w modelu
+    shared_quizzes = request.user.shared_quizzes.all() 
+    
+    return render(request, 'quizzes/my_quizzes.html', {
+        'quizzes': quizzes,
+        'shared_quizzes': shared_quizzes # Przekazujemy drugą listę
+    })
+    # --------------------------------------------
 
-# Widok quiz_create_view pozostaje bez zmian
+# Widok quiz_create_view zaktualizowany o obsługę M2M
 @login_required
 def quiz_create_view(request):
     if request.method == 'POST':
         form = QuizForm(request.POST)
+        # Filtrujemy queryset pola 'shared_with' PRZED walidacją
+        form.fields['shared_with'].queryset = User.objects.exclude(pk=request.user.pk)
+        
         if form.is_valid():
-            quiz = form.save(commit=False)
+            quiz = form.save(commit=False) # Zapisz quiz, ale jeszcze nie M2M
             quiz.author = request.user
             quiz.save()
+            form.save_m2m() # Zapisz relacje Many-to-Many
+            
             messages.success(request, f"Quiz '{quiz.title}' został utworzony. Teraz dodaj pytania.")
             return redirect('quiz-edit', pk=quiz.pk)
     else:
         form = QuizForm()
+        # Filtrujemy queryset, aby nie pokazywać autora na liście do udostępniania
+        form.fields['shared_with'].queryset = User.objects.exclude(pk=request.user.pk)
+
     return render(request, 'quizzes/quiz_form.html', {'quiz_form': form, 'is_new': True})
 
-# Widok quiz_edit_view pozostaje bez zmian
+# Widok quiz_edit_view zaktualizowany o filtrowanie
 @login_required
 def quiz_edit_view(request, pk):
     quiz = get_object_or_404(Quiz, pk=pk, author=request.user)
+    
     if request.method == 'POST':
         form = QuizForm(request.POST, instance=quiz)
+        # Filtrujemy queryset pola 'shared_with' PRZED walidacją
+        form.fields['shared_with'].queryset = User.objects.exclude(pk=request.user.pk)
+        
         if form.is_valid():
-            form.save()
+            form.save() # Domyślnie zapisuje też M2M
             messages.success(request, "Zapisano zmiany w quizie.")
             return redirect('quiz-edit', pk=quiz.pk)
     else:
         form = QuizForm(instance=quiz)
+        # Filtrujemy queryset, aby nie pokazywać autora na liście do udostępniania
+        form.fields['shared_with'].queryset = User.objects.exclude(pk=request.user.pk)
     
     return render(request, 'quizzes/quiz_form.html', {'quiz_form': form, 'quiz': quiz})
 
+# (Widoki question_create_view i question_edit_view bez zmian)
 @login_required
 def question_create_view(request, quiz_pk):
     quiz = get_object_or_404(Quiz, pk=quiz_pk, author=request.user)
@@ -114,7 +141,6 @@ def question_create_view(request, quiz_pk):
         answer_formset = AnswerFormSet(request.POST)
         
         if question_form.is_valid() and answer_formset.is_valid():
-            # 🔽 NOWA LOGIKA WALIDACJI
             question_type = question_form.cleaned_data.get('question_type')
             correct_answers_count = 0
             for form in answer_formset.cleaned_data:
@@ -122,13 +148,10 @@ def question_create_view(request, quiz_pk):
                     correct_answers_count += 1
             
             if question_type == Question.QuestionType.SINGLE and correct_answers_count != 1:
-                # Wyświetl błąd, jeśli typ to "Jednokrotny" a liczba odp. nie jest równa 1
                 question_form.add_error('question_type', 'Pytanie jednokrotnego wyboru musi mieć dokładnie jedną poprawną odpowiedź.')
             elif question_type == Question.QuestionType.MULTIPLE and correct_answers_count == 0:
-                # Wyświetl błąd, jeśli typ to "Wielokrotny" a nie ma żadnej poprawnej odp.
                 question_form.add_error('question_type', 'Pytanie wielokrotnego wyboru musi mieć przynajmniej jedną poprawną odpowiedź.')
             else:
-                # Walidacja pomyślna, zapisz pytanie i odpowiedzi
                 question = question_form.save(commit=False)
                 question.quiz = quiz
                 question.save()
@@ -156,11 +179,9 @@ def question_edit_view(request, pk):
         answer_formset = AnswerFormSet(request.POST, instance=question)
         
         if question_form.is_valid() and answer_formset.is_valid():
-            # 🔽 NOWA LOGIKA WALIDACJI (taka sama jak w create_view)
             question_type = question_form.cleaned_data.get('question_type')
             correct_answers_count = 0
             for form in answer_formset.cleaned_data:
-                # Upewnij się, że formularz nie jest oznaczony do usunięcia (jeśli kiedyś dodasz)
                 if form.get('is_correct') and not form.get('DELETE'):
                     correct_answers_count += 1
             
@@ -185,7 +206,7 @@ def question_edit_view(request, pk):
     return render(request, 'quizzes/question_form.html', context)
 
 
-# Widok question_delete_view pozostaje bez zmian
+# (Widok question_delete_view bez zmian)
 @login_required
 def question_delete_view(request, pk):
     question = get_object_or_404(Question, pk=pk, quiz__author=request.user)
@@ -197,7 +218,7 @@ def question_delete_view(request, pk):
     
     return render(request, 'quizzes/question_confirm_delete.html', {'question': question})
 
-# Widok quiz_delete_view pozostaje bez zmian
+# (Widok quiz_delete_view bez zmian)
 @login_required
 def quiz_delete_view(request, pk):
     quiz = get_object_or_404(Quiz, pk=pk, author=request.user)
@@ -207,11 +228,29 @@ def quiz_delete_view(request, pk):
         return redirect('my-quizzes')
     return render(request, 'quizzes/quiz_confirm_delete.html', {'quiz': quiz})
 
-# Funkcja _can_view_quiz pozostaje bez zmian
+# --- ZAKTUALIZOWANA FUNKCJA UPRAWNIEŃ ---
 def _can_view_quiz(user, quiz):
-    return quiz.visibility == 'PUBLIC' or (user.is_authenticated and quiz.author == user)
+    # Publiczne quizy widzą wszyscy
+    if quiz.visibility == 'PUBLIC':
+        return True
+    
+    # Użytkownicy niezalogowani nie widzą nic więcej
+    if not user.is_authenticated:
+        return False
+        
+    # Autor widzi swój quiz
+    if quiz.author == user:
+        return True
+        
+    # Użytkownik, któremu udostępniono, widzi quiz
+    if quiz.shared_with.filter(pk=user.pk).exists():
+        return True
+        
+    # W pozostałych przypadkach brak dostępu
+    return False
+# ----------------------------------------
 
-# 🔽 ZAKTUALIZOWANY WIDOK (Logika oceniania)
+# (Widok quiz_take_view bez zmian - korzysta z _can_view_quiz)
 def quiz_take_view(request, pk):
     quiz = get_object_or_404(Quiz, pk=pk)
 
@@ -223,17 +262,13 @@ def quiz_take_view(request, pk):
         messages.info(request, "Ten quiz nie ma jeszcze pytań.")
         return redirect('quiz-detail', pk=quiz.pk)
     
-    # --- ZMODYFIKOWANA LOGIKA LIMITU CZASU ---
-    # Pobieramy z modelu (w minutach) i przeliczamy na sekundy
     time_limit_seconds = quiz.time_limit * 60
-    # ----------------------------------------
 
     if request.method == 'POST':
         total = quiz.questions.count()
         correct_count = 0
         details = []
 
-        # (Logika oceniania POST - bez zmian)
         for question in quiz.questions.prefetch_related('answers'):
             field = f"q_{question.id}"
             correct_ids = set(question.answers.filter(is_correct=True).values_list('id', flat=True))
@@ -246,7 +281,7 @@ def quiz_take_view(request, pk):
                     try:
                         chosen_ids.add(int(chosen_id_str))
                     except ValueError:
-                        pass 
+                        pass
             else:
                 chosen_id_strs = request.POST.getlist(field)
                 for id_str in chosen_id_strs:
@@ -277,7 +312,6 @@ def quiz_take_view(request, pk):
             'time_over': request.POST.get('time_over') == '1'
         })
 
-    # GET -> rozwiązywanie (bez zmian)
     questions_data = []
     for q in quiz.questions.prefetch_related('answers'):
         answers = list(q.answers.all())
@@ -287,9 +321,10 @@ def quiz_take_view(request, pk):
     return render(request, 'quizzes/quiz_take.html', {
         'quiz': quiz,
         'questions_data': questions_data,
-        'time_limit': time_limit_seconds, # Przekazujemy przeliczoną wartość
+        'time_limit': time_limit_seconds,
     })
 
+# (Widoki importu/exportu bez zmian)
 @login_required
 def quiz_export_json_view(request, pk):
     """
@@ -299,7 +334,6 @@ def quiz_export_json_view(request, pk):
     
     questions_data = []
     
-    # Używamy prefetch_related dla optymalizacji zapytań
     for q in quiz.questions.prefetch_related('answers'):
         answers_data = [
             {'text': ans.text, 'is_correct': ans.is_correct}
@@ -318,13 +352,11 @@ def quiz_export_json_view(request, pk):
         'questions': questions_data
     }
     
-    # Przygotowanie odpowiedzi HTTP z plikiem JSON
     response = HttpResponse(
         json.dumps(json_data, indent=4, ensure_ascii=False),
         content_type='application/json; charset=utf-8'
     )
     
-    # Tworzenie bezpiecznej nazwy pliku
     safe_title = slugify(quiz.title)
     if not safe_title:
         safe_title = 'quiz'
@@ -334,8 +366,8 @@ def quiz_export_json_view(request, pk):
 
 
 @login_required
-@require_POST # Ten widok powinien przyjmować tylko metodę POST
-@transaction.atomic # Używamy transakcji, aby w razie błędu nic się nie zapisało
+@require_POST
+@transaction.atomic
 def quiz_import_json_view(request, pk):
     """
     Importuje pytania z pliku JSON i dodaje je do quizu.
@@ -354,7 +386,6 @@ def quiz_import_json_view(request, pk):
         return redirect('quiz-edit', pk=quiz.pk)
 
     try:
-        # Dekodujemy plik ręcznie, aby mieć pewność kodowania UTF-8
         try:
             file_content = file.read().decode('utf-8')
             data = json.loads(file_content)
@@ -366,12 +397,11 @@ def quiz_import_json_view(request, pk):
         if 'questions' not in data or not isinstance(data['questions'], list):
             raise ValidationError("Plik JSON musi zawierać klucz 'questions' z listą pytań.")
 
-        questions_to_create = [] # Przechowujemy dane do walidacji
+        questions_to_create = [] 
 
         for i, q_data in enumerate(data['questions']):
             q_num = i + 1
             
-            # 1. Walidacja struktury pytania
             if not isinstance(q_data, dict):
                 raise ValidationError(f"Pytanie {q_num}: Nie jest poprawnym obiektem JSON.")
                 
@@ -386,7 +416,6 @@ def quiz_import_json_view(request, pk):
             explanation = q_data.get('explanation', '')
             answers_data = q_data.get('answers')
             
-            # 2. Walidacja struktury odpowiedzi
             if not answers_data or not isinstance(answers_data, list) or len(answers_data) < 2:
                  raise ValidationError(f"Pytanie {q_num} ('{text[:20]}...'): Musi zawierać listę 'answers' z co najmniej 2 odpowiedziami.")
 
@@ -408,28 +437,22 @@ def quiz_import_json_view(request, pk):
                     correct_count += 1
                 validated_answers.append({'text': ans_text, 'is_correct': is_correct})
             
-            # 3. Walidacja logiki (zgodnie z question_create_view)
             if question_type == Question.QuestionType.SINGLE and correct_count != 1:
                 raise ValidationError(f"Pytanie {q_num} (Jednokrotny): Musi mieć dokładnie 1 poprawną odpowiedź (znaleziono {correct_count}).")
             if question_type == Question.QuestionType.MULTIPLE and correct_count == 0:
                 raise ValidationError(f"Pytanie {q_num} (Wielokrotny): Musi mieć przynajmniej 1 poprawną odpowiedź.")
             
-            # Jeśli wszystko OK, dodajemy do listy do utworzenia
             questions_to_create.append({
                 'q_obj': Question(quiz=quiz, text=text, explanation=explanation, question_type=question_type),
                 'answers': validated_answers
             })
-
-        # --- ZAPIS DO BAZY ---
-        # Jeśli pętla przeszła bez błędów, zapisujemy wszystko (w ramach transakcji)
         
         num_created = len(questions_to_create)
         
         for q_batch in questions_to_create:
             q = q_batch['q_obj']
-            q.save() # Zapisujemy pytanie, aby dostać ID
+            q.save() 
             
-            # Tworzymy odpowiedzi powiązane z tym pytaniem
             answers_to_save = [
                 Answer(question=q, text=ans_data['text'], is_correct=ans_data['is_correct'])
                 for ans_data in q_batch['answers']
@@ -439,12 +462,8 @@ def quiz_import_json_view(request, pk):
         messages.success(request, f"Pomyślnie zaimportowano {num_created} pytań.")
 
     except ValidationError as e:
-        # Jawny błąd walidacji
         messages.error(request, f"Błąd walidacji: {e.message}")
-        # Transakcja zostanie automatycznie wycofana
     except Exception as e:
-        # Inne błędy (np. I/O)
         messages.error(request, f"Wystąpił nieoczekiwany błąd: {e}")
-        # Transakcja zostanie automatycznie wycofana
 
     return redirect('quiz-edit', pk=quiz.pk)
