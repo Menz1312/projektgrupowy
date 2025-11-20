@@ -49,3 +49,29 @@ class Answer(models.Model):
     text = models.CharField(max_length=255)
     is_correct = models.BooleanField(default=False)
     def __str__(self): return self.text
+
+# --- NOWY MODEL DO PRZECHOWYWANIA PRÓB ---
+class QuizAttempt(models.Model):
+    quiz = models.ForeignKey(Quiz, on_delete=models.CASCADE, related_name="attempts", verbose_name="Quiz")
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, 
+        on_delete=models.SET_NULL, # Zachowaj próbę, nawet jeśli użytkownik zostanie usunięty
+        null=True, 
+        blank=True, # Zezwalaj na próby anonimowe
+        related_name="attempts",
+        verbose_name="Użytkownik"
+    )
+    score = models.IntegerField(verbose_name="Wynik (%)")
+    correct_count = models.IntegerField(verbose_name="Poprawne odpowiedzi")
+    total_questions = models.IntegerField(verbose_name="Liczba pytań")
+    time_over = models.BooleanField(default=False, verbose_name="Przekroczono czas")
+    timestamp = models.DateTimeField(auto_now_add=True, verbose_name="Data podejścia")
+
+    def __str__(self):
+        user_str = self.user.username if self.user else "Anonim"
+        return f"Próba: {self.quiz.title} - {user_str} ({self.score}%)"
+
+    class Meta:
+        verbose_name = "Próba (Attempt)"
+        verbose_name_plural = "Próby (Attempts)"
+        ordering = ['-timestamp'] # Najnowsze próby na górze
