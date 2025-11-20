@@ -2,7 +2,7 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
-from .models import Quiz, Question, Answer
+from .models import Quiz, Question, Answer, QuizAttempt
 from .forms import QuizForm, QuestionForm, AnswerFormSet
 import os, json
 from dotenv import load_dotenv
@@ -264,11 +264,13 @@ def quiz_take_view(request, pk):
     
     time_limit_seconds = quiz.time_limit * 60
 
+    # POCZĄTEK LOGIKI POST (tylko gdy formularz jest wysyłany)
     if request.method == 'POST':
         total = quiz.questions.count()
         correct_count = 0
         details = []
 
+        # Ta pętla musi być WEWNĄTRZ bloku POST
         for question in quiz.questions.prefetch_related('answers'):
             field = f"q_{question.id}"
             correct_ids = set(question.answers.filter(is_correct=True).values_list('id', flat=True))
@@ -303,27 +305,48 @@ def quiz_take_view(request, pk):
             })
 
         score_percent = round((correct_count / total) * 100)
+        time_over_bool = request.POST.get('time_over') == '1'
+
+        # Logika zapisu wyniku również musi być WEWNĄTRZ bloku POST
+        user_to_save = None
+        if request.user.is_authenticated:
+            user_to_save = request.user
+        
+        QuizAttempt.objects.create(
+            quiz=quiz,
+            user=user_to_save,
+            score=score_percent,
+            correct_count=correct_count,
+            total_questions=total,
+            time_over=time_over_bool
+        )
+
+        # Zwrócenie strony z wynikiem (nadal w bloku POST)
         return render(request, 'quizzes/quiz_result.html', {
             'quiz': quiz,
             'total': total,
             'correct_count': correct_count,
             'score_percent': score_percent,
             'details': details,
-            'time_over': request.POST.get('time_over') == '1'
+            'time_over': time_over_bool
         })
+    
+    # KONIEC BLOKU POST
 
+    # POCZĄTEK LOGIKI GET (tylko gdy strona jest ładowana)
+    # Ten kod wykona się, jeśli request.method NIE był 'POST'
     questions_data = []
     for q in quiz.questions.prefetch_related('answers'):
         answers = list(q.answers.all())
         random.shuffle(answers)
         questions_data.append({'q': q, 'answers': answers})
 
+    # Zwrócenie strony z pytaniami (logika GET)
     return render(request, 'quizzes/quiz_take.html', {
         'quiz': quiz,
         'questions_data': questions_data,
         'time_limit': time_limit_seconds,
     })
-
 # (Widoki importu/exportu bez zmian)
 @login_required
 def quiz_export_json_view(request, pk):
