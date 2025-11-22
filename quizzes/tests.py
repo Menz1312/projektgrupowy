@@ -163,3 +163,92 @@ class QuizImportTests(TestCase):
         self.assertEqual(response.status_code, 302)
         # Sprawdzamy, czy URL logowania zawiera poprawny parametr "next"
         self.assertRedirects(response, f'{self.login_url}?next={self.import_url}')
+
+class QuizTakingTests(TestCase):
+    
+    def setUp(self):
+        # 1. Tworzymy użytkownika
+        self.user = User.objects.create_user(username='student', password='password123')
+        
+        # 2. Tworzymy quiz
+        self.quiz = Quiz.objects.create(
+            title="Egzamin z wiedzy ogólnej",
+            author=self.user,
+            visibility='PRIVATE', # Autor widzi swój prywatny quiz
+            time_limit=10
+        )
+        
+        # 3. Tworzymy Pytanie 1 (Jednokrotny wybór - SINGLE)
+        self.q1 = Question.objects.create(
+            quiz=self.quiz,
+            text="Stolica Polski?",
+            question_type=Question.QuestionType.SINGLE
+        )
+        self.a1_correct = Answer.objects.create(question=self.q1, text="Warszawa", is_correct=True)
+        self.a1_wrong = Answer.objects.create(question=self.q1, text="Kraków", is_correct=False)
+        
+        # 4. Tworzymy Pytanie 2 (Wielokrotny wybór - MULTIPLE)
+        self.q2 = Question.objects.create(
+            quiz=self.quiz,
+            text="Wybierz kolory flagi Polski",
+            question_type=Question.QuestionType.MULTIPLE
+        )
+        self.a2_correct1 = Answer.objects.create(question=self.q2, text="Biały", is_correct=True)
+        self.a2_correct2 = Answer.objects.create(question=self.q2, text="Czerwony", is_correct=True)
+        self.a2_wrong = Answer.objects.create(question=self.q2, text="Zielony", is_correct=False)
+
+        # URL do rozwiązywania tego quizu
+        self.take_url = reverse('quiz-start', kwargs={'pk': self.quiz.pk})
+
+    def test_quiz_perfect_score(self):
+        """
+        Testuje User Story: Rozwiązanie quizu (Happy Path - 100% poprawnych).
+        """
+        self.client.login(username='student', password='password123')
+
+        # Przygotowujemy dane formularza (odpowiedzi użytkownika)
+        # Dla SINGLE: wartość to ID wybranej odpowiedzi
+        # Dla MULTIPLE: lista ID wybranych odpowiedzi
+        form_data = {
+            f'q_{self.q1.id}': self.a1_correct.id,
+            f'q_{self.q2.id}': [self.a2_correct1.id, self.a2_correct2.id]
+        }
+
+        # Wysłanie formularza
+        response = self.client.post(self.take_url, form_data)
+
+        # 1. Weryfikacja: Czy strona się załadowała (200 OK) i używa szablonu wyników
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, 'quizzes/quiz_result.html')
+
+        # 2. Weryfikacja logiki: Czy poprawnie policzono punkty
+        # Dane te są przekazywane w kontekście szablonu
+        self.assertEqual(response.context['correct_count'], 2)
+        self.assertEqual(response.context['total'], 2)
+        self.assertEqual(response.context['score_percent'], 100)
+        
+        # Sprawdzenie czy w szczegółach pytania jest flaga is_correct=True
+        details = response.context['details']
+        self.assertTrue(details[0]['is_correct']) # Pierwsze pytanie
+        self.assertTrue(details[1]['is_correct']) # Drugie pytanie
+
+    def test_quiz_partial_score(self):
+        """
+        Testuje User Story: Rozwiązanie quizu (Błędne odpowiedzi - 50%).
+        """
+        self.client.login(username='student', password='password123')
+
+        form_data = {
+            f'q_{self.q1.id}': self.a1_correct.id,      # Dobrze
+            f'q_{self.q2.id}': [self.a2_correct1.id]    # Źle (brak drugiej poprawnej odpowiedzi w pytaniu wielokrotnym)
+        }
+
+        response = self.client.post(self.take_url, form_data)
+
+        self.assertEqual(response.status_code, 200)
+        
+        # Oczekujemy 1 punktu na 2 możliwe (50%)
+        # (Logika w views.py: pytanie wielokrotne jest poprawne TYLKO gdy zaznaczono wszystkie dobre i żadnej złej)
+        self.assertEqual(response.context['correct_count'], 1)
+        self.assertEqual(response.context['total'], 2)
+        self.assertEqual(response.context['score_percent'], 50)
