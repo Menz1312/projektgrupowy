@@ -1,9 +1,12 @@
 {% extends 'base.html' %}
 {% block title %}Moje Quizy{% endblock %}
 {% block content %}
-    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;">
+    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; margin-bottom: 2rem;">
         <h1>Moje Quizy</h1>
-        <a href="{% url 'quiz-create' %}" class="btn btn-primary" style="margin-bottom: 1rem;">Stwórz Nowy Quiz Ręcznie</a>
+        <div style="display: flex; gap: 10px;">
+            <a href="{% url 'quiz-create' %}" class="btn btn-secondary">Stwórz Ręcznie</a>
+            <a href="{% url 'quiz-generate' %}" class="btn btn-primary">✨ Generuj z AI</a>
+        </div>
     </div>
  
     <h2>Twoja lista quizów:</h2>
@@ -32,4 +35,4 @@
             <p>Nikt jeszcze nie udostępnił Ci żadnego quizu.</p>
         {% endfor %}
     </div>
-    {% endblock %}
+{% endblock %}
