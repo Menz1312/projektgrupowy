@@ -1,0 +1,38 @@
+{% extends 'base.html' %}
+{% block title %}Generator Quizów AI{% endblock %}
+
+{% block content %}
+<div style="max-width: 600px; margin: 0 auto;">
+    <h1>Generator Quizów AI</h1>
+    <p>Wpisz temat, a sztuczna inteligencja stworzy dla Ciebie quiz.</p>
+
+    <form method="post" style="background: #fff; padding: 2rem; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">
+        {% csrf_token %}
+        
+        {% if form.non_field_errors %}
+            <div style="color: red; margin-bottom: 1rem;">{{ form.non_field_errors }}</div>
+        {% endif %}
+
+        <div style="margin-bottom: 1rem;">
+            <label style="display:block; font-weight:bold; margin-bottom:0.5rem;">{{ form.topic.label }}</label>
+            {{ form.topic }}
+            {% if form.topic.errors %}
+                <div style="color: red">{{ form.topic.errors }}</div>
+            {% endif %}
+        </div>
+
+        <div style="margin-bottom: 1rem;">
+            <label style="display:block; font-weight:bold; margin-bottom:0.5rem;">{{ form.count.label }}</label>
+            {{ form.count }}
+            {% if form.count.errors %}
+                <div style="color: red">{{ form.count.errors }}</div>
+            {% endif %}
+        </div>
+
+        <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 1rem;">Generuj Quiz</button>
+        <p style="font-size: 0.8rem; color: #666; text-align: center; margin-top: 1rem;">
+            To może potrwać chwilę. Proszę nie odświeżać strony.
+        </p>
+    </form>
+</div>
+{% endblock %}

@@ -2,36 +2,30 @@
 from django import forms
 from .models import Quiz, Question, Answer
 from django.forms import inlineformset_factory
-from django.contrib.auth import get_user_model # <-- NOWY IMPORT
+from django.contrib.auth import get_user_model
 
-User = get_user_model() # <-- Pobranie modelu użytkownika
+User = get_user_model()
 
 class QuizForm(forms.ModelForm):
-    # --- NOWE POLE FORMULARZA ---
-    # Definiujemy je jawnie, aby dostosować widget i queryset
     shared_with = forms.ModelMultipleChoiceField(
-        queryset=User.objects.none(), # Zaczynamy od pustego QuerySet, widok je ustawi
+        queryset=User.objects.none(),
         widget=forms.CheckboxSelectMultiple,
         required=False,
         label="Udostępnij użytkownikom"
     )
-    # --------------------------
 
     class Meta:
         model = Quiz
-        # --- ZMODYFIKOWANE POLA ---
         fields = ['title', 'visibility', 'time_limit', 'shared_with']
         labels = {
             'title': 'Tytuł Quizu',
             'visibility': 'Widoczność',
-            # 'time_limit' i 'shared_with' użyją etykiet z definicji
         }
         widgets = {
             'time_limit': forms.NumberInput(attrs={'min': 0, 'step': 1}),
-            'visibility': forms.RadioSelect, # Lepsze niż <select>
+            'visibility': forms.RadioSelect,
         }
 
-# (Reszta pliku - QuestionForm i AnswerFormSet - bez zmian)
 class QuestionForm(forms.ModelForm):
     class Meta:
         model = Question
@@ -54,12 +48,10 @@ AnswerFormSet = inlineformset_factory(
     Question,
     Answer,
     fields=('text', 'is_correct'),
-    
     extra=2, 
     max_num=10, 
     min_num=2, 
     can_delete=True, 
-    
     labels={
         'text': 'Treść odpowiedzi',
         'is_correct': 'Czy ta odpowiedź jest poprawna?'
@@ -68,3 +60,18 @@ AnswerFormSet = inlineformset_factory(
         'text': forms.TextInput(attrs={'placeholder': 'Wpisz odpowiedź...'}),
     }
 )
+
+# --- NOWY FORMULARZ DO GENEROWANIA ---
+class QuizGenerationForm(forms.Form):
+    topic = forms.CharField(
+        label="Temat quizu", 
+        max_length=100, 
+        widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'np. Historia Polski, Programowanie w Pythonie...'})
+    )
+    count = forms.IntegerField(
+        label="Liczba pytań", 
+        min_value=1, 
+        max_value=10, 
+        initial=5,
+        widget=forms.NumberInput(attrs={'class': 'form-control'})
+    )

@@ -1,137 +1,244 @@
 # quizzes/views.py
+import json
+import requests
+import random
+import os
+from dotenv import load_dotenv  # <-- Nowy import
+
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
-from .models import Quiz, Question, Answer, QuizAttempt
-from .forms import QuizForm, QuestionForm, AnswerFormSet
-import os, json
-from dotenv import load_dotenv
-import random
 from django.http import HttpResponse
 from django.utils.text import slugify
 from django.db import transaction
 from django.core.exceptions import ValidationError
 from django.views.decorators.http import require_POST
-import openai
-from django.contrib.auth import get_user_model # <-- NOWY IMPORT
+from django.contrib.auth import get_user_model
 
+from .models import Quiz, Question, Answer, QuizAttempt
+from .forms import QuizForm, QuestionForm, AnswerFormSet, QuizGenerationForm
+
+User = get_user_model()
+
+# Załaduj zmienne z pliku .env
 load_dotenv()
-User = get_user_model() # <-- Pobranie modelu użytkownika
 
-# Widok home_view pozostaje bez zmian
+# --- KONFIGURACJA HUGGING FACE ---
+# Pobieramy token z bezpiecznego pliku .env
+HF_TOKEN = os.getenv("HF_TOKEN")
+
+# Nowy, uniwersalny endpoint routera (zgodny z OpenAI)
+HF_API_URL = "https://router.huggingface.co/v1/chat/completions"
+
 def home_view(request):
     query = request.GET.get('q', '')
     quizzes = Quiz.objects.filter(visibility='PUBLIC', title__icontains=query)
     return render(request, 'home.html', {'quizzes': quizzes})
 
-# Widok quiz_detail_view pozostaje bez zmian
+def _can_view_quiz(user, quiz):
+    if quiz.visibility == 'PUBLIC':
+        return True
+    if not user.is_authenticated:
+        return False
+    if quiz.author == user:
+        return True
+    if quiz.shared_with.filter(pk=user.pk).exists():
+        return True
+    return False
+
 def quiz_detail_view(request, pk):
     quiz = get_object_or_404(Quiz, pk=pk)
-    # Logika uprawnień jest teraz w _can_view_quiz
     if _can_view_quiz(request.user, quiz):
         return render(request, 'quizzes/quiz_detail.html', {'quiz': quiz})
     
     messages.error(request, "Nie masz uprawnień do wyświetlenia tego quizu.")
     return redirect('home')
 
-# Widok my_quizzes_view zaktualizowany o listę udostępnionych
 @login_required
 def my_quizzes_view(request):
-    if request.method == 'POST':
-        topic = request.POST.get('topic')
-        try:
-            openai.api_key = os.getenv("OPENAI_API_KEY")
-            if not openai.api_key:
-                raise ValueError("Klucz API OpenAI nie został skonfigurowany.")
-            
-            prompt = f"""
-            Wygeneruj quiz na temat "{topic}" w języku polskim. Przygotuj 5 pytań.
-            Odpowiedz wyłącznie w formacie JSON jako obiekt z kluczem "questions", który zawiera listę obiektów.
-            Każdy obiekt: "question" (string), "answers" (lista 4 stringów), "correct_indices" (lista integerów z poprawnymi indeksami od 0).
-            """
-            client = openai.OpenAI()
-            response = client.chat.completions.create(
-                model="gpt-3.5-turbo",
-                messages=[
-                    {"role": "system", "content": "Jesteś asystentem generującym quizy w formacie JSON."},
-                    {"role": "user", "content": prompt}
-                ],
-                response_format={"type": "json_object"}
-            )
-            
-            quiz_data_str = response.choices[0].message.content
-            quiz_data = json.loads(quiz_data_str).get('questions', [])
-            
-            if not quiz_data:
-                 raise ValueError("API nie zwróciło pytań w oczekiwanym formacie.")
-
-            new_quiz = Quiz.objects.create(title=f"Quiz AI: {topic}", author=request.user, visibility='PRIVATE')
-            for item in quiz_data:
-                q = Question.objects.create(quiz=new_quiz, text=item['question'])
-                for i, ans_text in enumerate(item['answers']):
-                    Answer.objects.create(question=q, text=ans_text, is_correct=(i in item.get('correct_indices', [])))
-            messages.success(request, f"Pomyślnie wygenerowano quiz na temat: {topic}!")
-
-        except Exception as e:
-            messages.error(request, f"Wystąpił błąd podczas generowania quizu: {e}")
-        return redirect('my-quizzes')
-    
-    # --- ZMODYFIKOWANA LOGIKA POBIERANIA QUIZÓW ---
     quizzes = Quiz.objects.filter(author=request.user)
-    # Używamy related_name 'shared_quizzes' zdefiniowanego w modelu
     shared_quizzes = request.user.shared_quizzes.all() 
     
     return render(request, 'quizzes/my_quizzes.html', {
         'quizzes': quizzes,
-        'shared_quizzes': shared_quizzes # Przekazujemy drugą listę
+        'shared_quizzes': shared_quizzes
     })
-    # --------------------------------------------
 
-# Widok quiz_create_view zaktualizowany o obsługę M2M
+# --- WIDOK GENEROWANIA (ZAKTUALIZOWANY URL I MODEL) ---
+@login_required
+def quiz_generate_view(request):
+    if request.method == 'POST':
+        form = QuizGenerationForm(request.POST)
+        if form.is_valid():
+            topic = form.cleaned_data['topic']
+            count = form.cleaned_data['count']
+            
+            try:
+                # Sprawdzenie czy token został załadowany
+                if not HF_TOKEN:
+                    raise ValueError("Brak klucza API (HF_TOKEN) w pliku .env")
+
+                headers = {
+                    "Authorization": f"Bearer {HF_TOKEN}",
+                    "Content-Type": "application/json"
+                }
+                
+                system_message = (
+                    "Jesteś ekspertem tworzącym quizy edukacyjne. "
+                    "Twoim zadaniem jest generowanie pytań w formacie czystego JSON. "
+                    "Nie dodawaj żadnych wstępów, wyjaśnień ani formatowania Markdown (np. ```json). "
+                    "Zwróć TYLKO obiekt JSON."
+                )
+                
+                user_prompt = f"""
+                Stwórz quiz w języku polskim na temat: "{topic}".
+                Liczba pytań: {count}.
+                
+                Wymagana struktura JSON:
+                {{
+                    "questions": [
+                        {{
+                            "question": "Treść pytania?",
+                            "answers": ["Odp A", "Odp B", "Odp C", "Odp D"],
+                            "correct_index": 0
+                        }}
+                    ]
+                }}
+                Ważne:
+                1. "correct_index" to numer poprawnej odpowiedzi (0-3).
+                2. Wygeneruj dokładnie {count} pytań.
+                """
+
+                # Używamy modelu Llama-3-8B-Instruct, który jest szeroko dostępny w darmowym tierze
+                payload = {
+                    "model": "meta-llama/Meta-Llama-3-8B-Instruct", 
+                    "messages": [
+                        {"role": "system", "content": system_message},
+                        {"role": "user", "content": user_prompt}
+                    ],
+                    "max_tokens": 2048,
+                    "stream": False,
+                    "temperature": 0.7
+                }
+
+                response = requests.post(HF_API_URL, headers=headers, json=payload)
+                
+                if response.status_code != 200:
+                    try:
+                        err_msg = response.json().get('error', response.text)
+                    except:
+                        err_msg = response.text
+                    raise Exception(f"Błąd API ({response.status_code}): {err_msg}")
+
+                result = response.json()
+                
+                if 'choices' in result and len(result['choices']) > 0:
+                    generated_text = result['choices'][0]['message']['content'].strip()
+                else:
+                    raise ValueError(f"Pusta odpowiedź od modelu: {result}")
+                
+                # Czyszczenie markdowna
+                if "```json" in generated_text:
+                    generated_text = generated_text.split("```json")[1].split("```")[0].strip()
+                elif "```" in generated_text:
+                    generated_text = generated_text.split("```")[1].strip()
+
+                try:
+                    data = json.loads(generated_text)
+                except json.JSONDecodeError:
+                    if generated_text.rfind('}') != -1:
+                        fixed_text = generated_text[:generated_text.rfind('}')+1] + "]}"
+                        try:
+                            data = json.loads(fixed_text)
+                        except:
+                            raise ValueError("Otrzymano niepoprawny JSON od AI.")
+                    else:
+                        raise ValueError("Otrzymano niepoprawny JSON od AI.")
+
+                questions_list = data.get('questions', [])
+
+                if not questions_list:
+                    raise ValueError("Lista pytań jest pusta.")
+
+                with transaction.atomic():
+                    new_quiz = Quiz.objects.create(
+                        title=f"AI Quiz: {topic}",
+                        author=request.user,
+                        visibility='PRIVATE'
+                    )
+                    
+                    for item in questions_list:
+                        q_text = item.get('question')
+                        answers = item.get('answers', [])
+                        correct_idx = item.get('correct_index', 0)
+                        
+                        if q_text and isinstance(answers, list) and len(answers) >= 2:
+                            if not isinstance(correct_idx, int) or correct_idx < 0 or correct_idx >= len(answers):
+                                correct_idx = 0
+                            
+                            q_obj = Question.objects.create(
+                                quiz=new_quiz,
+                                text=q_text,
+                                question_type=Question.QuestionType.SINGLE
+                            )
+                            
+                            for i, ans_text in enumerate(answers):
+                                Answer.objects.create(
+                                    question=q_obj,
+                                    text=str(ans_text),
+                                    is_correct=(i == correct_idx)
+                                )
+
+                messages.success(request, f"Sukces! Wygenerowano quiz z {len(questions_list)} pytaniami.")
+                return redirect('quiz-edit', pk=new_quiz.pk)
+
+            except Exception as e:
+                print(f"DEBUG ERROR: {str(e)}")
+                messages.error(request, f"Wystąpił błąd: {str(e)}")
+                
+    else:
+        form = QuizGenerationForm()
+
+    return render(request, 'quizzes/quiz_generate.html', {'form': form})
+# -------------------------------------------------------
+
 @login_required
 def quiz_create_view(request):
     if request.method == 'POST':
         form = QuizForm(request.POST)
-        # Filtrujemy queryset pola 'shared_with' PRZED walidacją
         form.fields['shared_with'].queryset = User.objects.exclude(pk=request.user.pk)
         
         if form.is_valid():
-            quiz = form.save(commit=False) # Zapisz quiz, ale jeszcze nie M2M
+            quiz = form.save(commit=False)
             quiz.author = request.user
             quiz.save()
-            form.save_m2m() # Zapisz relacje Many-to-Many
-            
-            messages.success(request, f"Quiz '{quiz.title}' został utworzony. Teraz dodaj pytania.")
+            form.save_m2m()
+            messages.success(request, f"Quiz '{quiz.title}' został utworzony.")
             return redirect('quiz-edit', pk=quiz.pk)
     else:
         form = QuizForm()
-        # Filtrujemy queryset, aby nie pokazywać autora na liście do udostępniania
         form.fields['shared_with'].queryset = User.objects.exclude(pk=request.user.pk)
 
     return render(request, 'quizzes/quiz_form.html', {'quiz_form': form, 'is_new': True})
 
-# Widok quiz_edit_view zaktualizowany o filtrowanie
 @login_required
 def quiz_edit_view(request, pk):
     quiz = get_object_or_404(Quiz, pk=pk, author=request.user)
     
     if request.method == 'POST':
         form = QuizForm(request.POST, instance=quiz)
-        # Filtrujemy queryset pola 'shared_with' PRZED walidacją
         form.fields['shared_with'].queryset = User.objects.exclude(pk=request.user.pk)
         
         if form.is_valid():
-            form.save() # Domyślnie zapisuje też M2M
+            form.save()
             messages.success(request, "Zapisano zmiany w quizie.")
             return redirect('quiz-edit', pk=quiz.pk)
     else:
         form = QuizForm(instance=quiz)
-        # Filtrujemy queryset, aby nie pokazywać autora na liście do udostępniania
         form.fields['shared_with'].queryset = User.objects.exclude(pk=request.user.pk)
     
     return render(request, 'quizzes/quiz_form.html', {'quiz_form': form, 'quiz': quiz})
 
-# (Widoki question_create_view i question_edit_view bez zmian)
 @login_required
 def question_create_view(request, quiz_pk):
     quiz = get_object_or_404(Quiz, pk=quiz_pk, author=request.user)
@@ -205,8 +312,6 @@ def question_edit_view(request, pk):
     }
     return render(request, 'quizzes/question_form.html', context)
 
-
-# (Widok question_delete_view bez zmian)
 @login_required
 def question_delete_view(request, pk):
     question = get_object_or_404(Question, pk=pk, quiz__author=request.user)
@@ -218,7 +323,6 @@ def question_delete_view(request, pk):
     
     return render(request, 'quizzes/question_confirm_delete.html', {'question': question})
 
-# (Widok quiz_delete_view bez zmian)
 @login_required
 def quiz_delete_view(request, pk):
     quiz = get_object_or_404(Quiz, pk=pk, author=request.user)
@@ -228,29 +332,6 @@ def quiz_delete_view(request, pk):
         return redirect('my-quizzes')
     return render(request, 'quizzes/quiz_confirm_delete.html', {'quiz': quiz})
 
-# --- ZAKTUALIZOWANA FUNKCJA UPRAWNIEŃ ---
-def _can_view_quiz(user, quiz):
-    # Publiczne quizy widzą wszyscy
-    if quiz.visibility == 'PUBLIC':
-        return True
-    
-    # Użytkownicy niezalogowani nie widzą nic więcej
-    if not user.is_authenticated:
-        return False
-        
-    # Autor widzi swój quiz
-    if quiz.author == user:
-        return True
-        
-    # Użytkownik, któremu udostępniono, widzi quiz
-    if quiz.shared_with.filter(pk=user.pk).exists():
-        return True
-        
-    # W pozostałych przypadkach brak dostępu
-    return False
-# ----------------------------------------
-
-# (Widok quiz_take_view bez zmian - korzysta z _can_view_quiz)
 def quiz_take_view(request, pk):
     quiz = get_object_or_404(Quiz, pk=pk)
 
@@ -264,17 +345,14 @@ def quiz_take_view(request, pk):
     
     time_limit_seconds = quiz.time_limit * 60
 
-    # POCZĄTEK LOGIKI POST (tylko gdy formularz jest wysyłany)
     if request.method == 'POST':
         total = quiz.questions.count()
         correct_count = 0
         details = []
 
-        # Ta pętla musi być WEWNĄTRZ bloku POST
         for question in quiz.questions.prefetch_related('answers'):
             field = f"q_{question.id}"
             correct_ids = set(question.answers.filter(is_correct=True).values_list('id', flat=True))
-            
             chosen_ids = set()
             
             if question.question_type == Question.QuestionType.SINGLE:
@@ -307,7 +385,6 @@ def quiz_take_view(request, pk):
         score_percent = round((correct_count / total) * 100)
         time_over_bool = request.POST.get('time_over') == '1'
 
-        # Logika zapisu wyniku również musi być WEWNĄTRZ bloku POST
         user_to_save = None
         if request.user.is_authenticated:
             user_to_save = request.user
@@ -321,7 +398,6 @@ def quiz_take_view(request, pk):
             time_over=time_over_bool
         )
 
-        # Zwrócenie strony z wynikiem (nadal w bloku POST)
         return render(request, 'quizzes/quiz_result.html', {
             'quiz': quiz,
             'total': total,
@@ -331,71 +407,46 @@ def quiz_take_view(request, pk):
             'time_over': time_over_bool
         })
     
-    # KONIEC BLOKU POST
-
-    # POCZĄTEK LOGIKI GET (tylko gdy strona jest ładowana)
-    # Ten kod wykona się, jeśli request.method NIE był 'POST'
     questions_data = []
     for q in quiz.questions.prefetch_related('answers'):
         answers = list(q.answers.all())
         random.shuffle(answers)
         questions_data.append({'q': q, 'answers': answers})
 
-    # Zwrócenie strony z pytaniami (logika GET)
     return render(request, 'quizzes/quiz_take.html', {
         'quiz': quiz,
         'questions_data': questions_data,
         'time_limit': time_limit_seconds,
     })
-# (Widoki importu/exportu bez zmian)
+
 @login_required
 def quiz_export_json_view(request, pk):
-    """
-    Eksportuje wszystkie pytania i odpowiedzi dla danego quizu do pliku JSON.
-    """
     quiz = get_object_or_404(Quiz, pk=pk, author=request.user)
-    
     questions_data = []
-    
     for q in quiz.questions.prefetch_related('answers'):
         answers_data = [
             {'text': ans.text, 'is_correct': ans.is_correct}
             for ans in q.answers.all()
         ]
-        
         questions_data.append({
             'text': q.text,
             'explanation': q.explanation,
             'question_type': q.question_type,
             'answers': answers_data
         })
-        
-    json_data = {
-        'title': quiz.title,
-        'questions': questions_data
-    }
-    
+    json_data = {'title': quiz.title, 'questions': questions_data}
     response = HttpResponse(
         json.dumps(json_data, indent=4, ensure_ascii=False),
         content_type='application/json; charset=utf-8'
     )
-    
-    safe_title = slugify(quiz.title)
-    if not safe_title:
-        safe_title = 'quiz'
-        
+    safe_title = slugify(quiz.title) or 'quiz'
     response['Content-Disposition'] = f'attachment; filename="quiz_{quiz.pk}_{safe_title}.json"'
     return response
-
 
 @login_required
 @require_POST
 @transaction.atomic
 def quiz_import_json_view(request, pk):
-    """
-    Importuje pytania z pliku JSON i dodaje je do quizu.
-    Wykonuje pełną walidację pliku przed zapisem.
-    """
     quiz = get_object_or_404(Quiz, pk=pk, author=request.user)
     
     if 'json_file' not in request.FILES:
@@ -433,44 +484,32 @@ def quiz_import_json_view(request, pk):
                 raise ValidationError(f"Pytanie {q_num}: Brak lub niepoprawny klucz 'text'.")
 
             question_type = q_data.get('question_type', Question.QuestionType.SINGLE)
-            if question_type not in Question.QuestionType.values:
-                raise ValidationError(f"Pytanie {q_num}: Niepoprawna wartość 'question_type'. Musi być 'SINGLE' lub 'MULTIPLE'.")
             
             explanation = q_data.get('explanation', '')
             answers_data = q_data.get('answers')
             
             if not answers_data or not isinstance(answers_data, list) or len(answers_data) < 2:
-                 raise ValidationError(f"Pytanie {q_num} ('{text[:20]}...'): Musi zawierać listę 'answers' z co najmniej 2 odpowiedziami.")
+                 raise ValidationError(f"Pytanie {q_num}: Musi zawierać listę 'answers' z co najmniej 2 odpowiedziami.")
 
-            correct_count = 0
             validated_answers = []
             
             for j, ans_data in enumerate(answers_data):
                 ans_num = j + 1
                 if not isinstance(ans_data, dict):
-                     raise ValidationError(f"Pytanie {q_num}, Odpowiedź {ans_num}: Nie jest poprawnym obiektem JSON.")
+                     raise ValidationError(f"Pytanie {q_num}, Odpowiedź {ans_num}: Błędny format.")
                 
                 ans_text = ans_data.get('text')
                 is_correct = ans_data.get('is_correct')
                 
-                if not ans_text or not isinstance(ans_text, str) or not isinstance(is_correct, bool):
-                    raise ValidationError(f"Pytanie {q_num}, Odpowiedź {ans_num}: Niepoprawna struktura (wymagane 'text' (str) i 'is_correct' (bool)).")
+                if not ans_text:
+                    continue
                 
-                if is_correct:
-                    correct_count += 1
                 validated_answers.append({'text': ans_text, 'is_correct': is_correct})
-            
-            if question_type == Question.QuestionType.SINGLE and correct_count != 1:
-                raise ValidationError(f"Pytanie {q_num} (Jednokrotny): Musi mieć dokładnie 1 poprawną odpowiedź (znaleziono {correct_count}).")
-            if question_type == Question.QuestionType.MULTIPLE and correct_count == 0:
-                raise ValidationError(f"Pytanie {q_num} (Wielokrotny): Musi mieć przynajmniej 1 poprawną odpowiedź.")
             
             questions_to_create.append({
                 'q_obj': Question(quiz=quiz, text=text, explanation=explanation, question_type=question_type),
                 'answers': validated_answers
             })
-        
-        num_created = len(questions_to_create)
         
         for q_batch in questions_to_create:
             q = q_batch['q_obj']
@@ -482,7 +521,7 @@ def quiz_import_json_view(request, pk):
             ]
             Answer.objects.bulk_create(answers_to_save)
         
-        messages.success(request, f"Pomyślnie zaimportowano {num_created} pytań.")
+        messages.success(request, f"Pomyślnie zaimportowano pytania.")
 
     except ValidationError as e:
         messages.error(request, f"Błąd walidacji: {e.message}")
