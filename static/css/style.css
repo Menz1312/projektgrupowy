@@ -116,6 +116,18 @@ h1 {
     filter: invert(1);
 }
 
+:root[data-theme="dark"] .badge.bg-light.text-dark {
+    background-color: var(--surface-hover) !important; /* Ciemne tło zamiast jasnego */
+    color: var(--text) !important;                     /* Jasny tekst */
+    border-color: var(--border) !important;            /* Ciemna ramka */
+}
+
+/* Opcjonalnie: Poprawka dla kart "Udostępnione dla mnie" które też używają bg-light */
+:root[data-theme="dark"] .card.bg-light {
+    background-color: rgba(255, 255, 255, 0.03) !important;
+    color: var(--text) !important;
+}
+
 /* === NAWIGACJA (style własne) === */
 nav { 
     background: var(--surface); 
@@ -323,4 +335,23 @@ input:focus, select:focus, textarea:focus {
 }
 :root[data-theme="dark"] .text-dark {
     color: #f1f5f9 !important;
+}
+
+/* === COOKIE BANNER === */
+#cookie-banner {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    z-index: 1050; /* Powyżej innych elementów */
+    background-color: var(--surface);
+    color: var(--text);
+    border-top: 1px solid var(--border);
+    box-shadow: 0 -4px 6px -1px rgba(0, 0, 0, 0.1);
+    transform: translateY(100%); /* Domyślnie ukryty (przesunięty w dół) */
+    transition: transform 0.3s ease-in-out;
+}
+
+#cookie-banner.show {
+    transform: translateY(0); /* Wysunięcie */
 }
