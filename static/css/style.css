@@ -1,174 +1,326 @@
-/* === Wybór tematu === */
+/* === ZMIENNE I KOLORYSTYKA === */
 :root {
-  --bg:#f5f7fb; --surface:#ffffff; --text:#1f2937; --muted:#6b7280;
-  --border:#e5e7eb; --primary:#2563eb; --primary-contrast:#ffffff;
-  --success:#22c55e; --error:#ef4444;
+  /* Jasny motyw (Light Mode) - czysty i czytelny */
+  --bg: #f8fafc;           /* Bardzo jasny szary */
+  --surface: #ffffff;      /* Biały */
+  --surface-hover: #f1f5f9;
+  --text: #1e293b;         /* Ciemny grafit */
+  --text-muted: #64748b;   /* Szary tekst */
+  --border: #e2e8f0;       /* Delikatna ramka */
+  
+  --primary: #4f46e5;      /* Indigo - nowoczesny niebieski */
+  --primary-hover: #4338ca;
+  --primary-text: #ffffff;
+  
+  --secondary: #64748b;
+  --secondary-hover: #475569;
+  
+  --danger: #ef4444;
+  --danger-hover: #dc2626;
+  
+  --success: #10b981;
+  
+  --shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  --radius: 12px;          /* Zaokrąglone rogi */
 }
+
 :root[data-theme="dark"] {
-  --bg:#0b1220; --surface:#121a2a; --text:#e5e7eb; --muted:#94a3b8;
-  --border:#1f2a44; --primary:#3b82f6; --primary-contrast:#0b1220;
-  --success:#16a34a; --error:#f43f5e;
+  /* Ciemny motyw (Dark Mode) - głęboki i kontrastowy */
+  --bg: #0f172a;           /* Bardzo ciemny granat */
+  --surface: #1e293b;      /* Ciemniejszy panel */
+  --surface-hover: #334155;
+  --text: #f1f5f9;         /* Jasny tekst */
+  --text-muted: #94a3b8;
+  --border: #334155;
+  
+  --primary: #6366f1;      /* Jaśniejszy Indigo dla kontrastu */
+  --primary-hover: #818cf8;
+  --primary-text: #0f172a; /* Ciemny tekst na jasnym przycisku */
+  
+  --secondary: #94a3b8;
+  --secondary-hover: #cbd5e1;
+  
+  --danger: #f87171;
+  --danger-hover: #fca5a5;
+  
+  --success: #34d399;
+  
+  --shadow: 0 4px 6px -1px rgb(0 0 0 / 0.3);
 }
 
-/* Bazowe elementy pod zmienne */
-html, body { background: var(--bg); color: var(--text); }
-nav { background: var(--surface); border-bottom: 1px solid var(--border); }
-a { color: var(--primary); }
-.container { background: var(--surface); border: 1px solid var(--border); }
-.messages .success { background-color: var(--success); }
-.messages .error { background-color: var(--error); }
-
-/* Przycisk przełącznika */
-.theme-toggle {
-  margin-left: 1rem; padding: .5rem .7rem; border-radius: 8px;
-  border: 1px solid var(--border); background: var(--surface); color: var(--text);
-  cursor: pointer;
+/* === BAZA === */
+* {
+    box-sizing: border-box;
 }
-
-/* (Opcjonalnie) twarde nadpisania, jeśli masz stare kolory inline */
-html, body{ background: var(--bg) !important; color: var(--text) !important; }
-nav{ background: var(--surface) !important; border-bottom:1px solid var(--border) !important; }
-.container{ background: var(--surface) !important; border:1px solid var(--border) !important; }
-
-
 
 body { 
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
-    background-color: #f0f2f5; 
-    color: #333; 
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
+    background-color: var(--bg); 
+    color: var(--text); 
     margin: 0; 
+    line-height: 1.6;
+    transition: background-color 0.3s, color 0.3s;
 }
 
+a { 
+    color: var(--primary); 
+    text-decoration: none; 
+    transition: color 0.2s;
+}
+
+a:hover {
+    text-decoration: underline;
+}
+
+h1, h2, h3, h4, h5, h6 {
+    color: var(--text);
+    margin-top: 0;
+}
+
+h1 {
+    font-size: 2rem;
+    margin-bottom: 1.5rem;
+}
+
+/* === KOMPONENTY BOOTSTRAP W TRYBIE CIEMNYM (FIX) === */
+:root[data-theme="dark"] .card {
+    background-color: var(--surface);
+    color: var(--text);
+    border-color: var(--border);
+}
+
+:root[data-theme="dark"] .card-header,
+:root[data-theme="dark"] .card-footer {
+    background-color: var(--surface-hover);
+    border-color: var(--border);
+}
+
+:root[data-theme="dark"] .list-group-item {
+    background-color: var(--bg);
+    color: var(--text);
+    border-color: var(--border);
+}
+
+:root[data-theme="dark"] .navbar {
+    background-color: var(--surface) !important;
+    border-bottom: 1px solid var(--border);
+}
+
+:root[data-theme="dark"] .navbar-brand,
+:root[data-theme="dark"] .nav-link {
+    color: var(--text) !important;
+}
+
+:root[data-theme="dark"] .navbar-toggler {
+    border-color: var(--border);
+    filter: invert(1);
+}
+
+/* === NAWIGACJA (style własne) === */
 nav { 
-    background: #fff; 
+    background: var(--surface); 
     padding: 1rem 2rem; 
     display: flex; 
     justify-content: space-between; 
     align-items: center; 
-    border-bottom: 1px solid #ddd; 
+    border-bottom: 1px solid var(--border);
+    box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1);
 }
 
 nav a.logo { 
-    font-size: 1.8rem; 
-    font-weight: bold; 
-    text-decoration: none; 
-    color: #333; 
+    font-size: 1.5rem; 
+    font-weight: 800; 
+    color: var(--primary); 
+    text-decoration: none;
+    letter-spacing: -0.5px;
 }
 
-nav .links a { 
-    margin-left: 1.5rem; 
-    text-decoration: none; 
-    color: #007bff; 
-    font-weight: 500; 
-}
-
-.container { 
-    max-width: 900px; 
-    margin: 2rem auto; 
-    padding: 2rem; 
-    background: #fff; 
-    border-radius: 8px; 
-    box-shadow: 0 0 10px rgba(0,0,0,0.1); 
-}
-
-h1, h2 { 
-    border-bottom: 2px solid #eee; 
-    padding-bottom: 0.5rem; 
-    margin-top: 0; 
-}
-
-.quiz-list .quiz-item { 
-    padding: 1rem; 
-    border: 1px solid #ddd; 
-    border-radius: 5px; 
-    margin-bottom: 1rem; 
+nav .links {
     display: flex; 
-    justify-content: space-between; 
     align-items: center; 
+    gap: 1.5rem;
 }
 
-.quiz-item a { 
-    text-decoration: none; 
-    color: #333; 
-    font-size: 1.2rem; 
-    font-weight: bold; 
+/* === KONTENER GŁÓWNY === */
+.container {
+    /* Bootstrap już ma klasę container, ale tutaj dodajemy własne style jeśli nie używasz bootstrapa w pełni */
+    /* Jeśli używasz Bootstrapa w base.html, te style mogą być nadpisane przez framework, co jest OK */
+    max-width: 1100px; /* Nieco szerszy dla Gridu */
 }
 
+/* === LISTA QUIZÓW (KARTY - style własne, jeśli nie używasz Bootstrap Grid) === */
+.quiz-list {
+    display: grid;
+    gap: 1rem;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+}
+
+.quiz-item { 
+    padding: 1.25rem; 
+    border: 1px solid var(--border); 
+    border-radius: var(--radius); 
+    background-color: var(--surface);
+    display: flex; 
+    flex-direction: column;
+    justify-content: space-between;
+    transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
+}
+
+/* === PRZYCISKI (Kompatybilność z klasami Bootstrap .btn) === */
 .btn { 
-    display: inline-block; 
+    display: inline-flex; 
+    align-items: center;
+    justify-content: center;
     padding: 0.6rem 1.2rem; 
-    border-radius: 5px; 
+    border-radius: 8px; 
     text-decoration: none; 
-    border: none; 
+    border: 1px solid transparent; 
     cursor: pointer; 
-    font-size: 1rem;
+    font-size: 0.95rem;
+    font-weight: 600;
+    transition: all 0.2s;
+    line-height: 1.5;
 }
 
-.btn-primary { background: #007bff; color: #fff; }
-.btn-secondary { background: #6c757d; color: #fff; }
-.btn-danger { background: #dc3545; color: #fff; }
+.btn:hover {
+    text-decoration: none;
+    filter: brightness(110%);
+}
 
-form p { margin-bottom: 1rem; }
-label { display: block; margin-bottom: 0.5rem; font-weight: bold; }
-input[type="text"], input[type="search"], input[type="email"], input[type="password"], select { 
+.btn-primary { 
+    background-color: var(--primary); 
+    border-color: var(--primary);
+    color: var(--primary-text); 
+}
+.btn-primary:hover { 
+    background-color: var(--primary-hover); 
+    border-color: var(--primary-hover);
+}
+
+.btn-secondary, .btn-light { 
+    background-color: var(--surface); 
+    color: var(--text); 
+    border-color: var(--border);
+}
+.btn-secondary:hover, .btn-light:hover { 
+    background-color: var(--surface-hover); 
+    border-color: var(--text-muted);
+    color: var(--text);
+}
+
+.btn-danger { 
+    background-color: var(--danger); 
+    border-color: var(--danger);
+    color: #fff; 
+}
+.btn-danger:hover { 
+    background-color: var(--danger-hover); 
+    border-color: var(--danger-hover);
+}
+
+.btn-outline-primary {
+    color: var(--primary);
+    border-color: var(--primary);
+    background-color: transparent;
+}
+.btn-outline-primary:hover {
+    background-color: var(--primary);
+    color: #fff;
+}
+
+/* === FORMULARZE === */
+form p { margin-bottom: 1.2rem; }
+
+label { 
+    display: block; 
+    margin-bottom: 0.5rem; 
+    font-weight: 500; 
+    color: var(--text);
+    font-size: 0.9rem;
+}
+
+input[type="text"], 
+input[type="search"], 
+input[type="email"], 
+input[type="password"], 
+input[type="number"],
+select, 
+textarea { 
     width: 100%; 
     padding: 0.75rem; 
-    border: 1px solid #ccc; 
-    border-radius: 4px; 
+    border: 1px solid var(--border); 
+    border-radius: 8px; 
     box-sizing: border-box; 
+    background-color: var(--bg);
+    color: var(--text);
+    font-size: 1rem;
+    transition: border-color 0.2s;
 }
 
+input:focus, select:focus, textarea:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.2); /* Kolor primary z przezroczystością */
+}
+
+/* === WIADOMOŚCI === */
 .messages {
     padding: 0;
-    margin: 0;
+    margin: 0 0 1rem 0;
+    list-style: none;
 }
-.messages p { 
+.messages p, .alert { 
     padding: 1rem; 
-    margin: 0; 
-    color: #fff;
-    text-align: center;
+    margin-bottom: 1rem; 
+    border-radius: 8px;
+    font-weight: 500;
 }
-.messages .success { background-color: #28a745; }
-.messages .error { background-color: #dc3545; }
-
-/* === Dark mode overrides (quick patch) === */
-html[data-theme="dark"] body { 
-  background-color: #0b1220 !important; 
-  color: #e5e7eb !important; 
+.messages .success, .alert-success { 
+    background-color: rgba(16, 185, 129, 0.1); 
+    color: var(--success); 
+    border: 1px solid var(--success);
 }
-
-html[data-theme="dark"] nav { 
-  background: #121a2a !important; 
-  border-bottom: 1px solid #1f2a44 !important; 
-}
-html[data-theme="dark"] nav a.logo { color: #e5e7eb !important; }
-html[data-theme="dark"] nav .links a { color: #3b82f6 !important; }
-
-html[data-theme="dark"] .container { 
-  background: #121a2a !important; 
-  border: 1px solid #1f2a44 !important; 
-  color: #e5e7eb !important; 
+.messages .error, .alert-danger { 
+    background-color: rgba(239, 68, 68, 0.1); 
+    color: var(--danger);
+    border: 1px solid var(--danger);
 }
 
-html[data-theme="dark"] .quiz-list .quiz-item { 
-  background: #121a2a !important; 
-  border: 1px solid #1f2a44 !important; 
+/* === DARK MODE TOGGLE (Ikona w menu) === */
+.theme-toggle {
+  /* Style dla przycisku, jeśli nie używasz klas Bootstrapa */
+  padding: 0.5rem; 
+  border-radius: 50%;
+  border: 1px solid var(--border); 
+  background-color: var(--surface); 
+  color: var(--text);
+  cursor: pointer;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.2rem;
+  transition: transform 0.2s, background-color 0.2s;
+}
+.theme-toggle:hover {
+    transform: rotate(15deg);
+    background-color: var(--surface-hover);
 }
 
-html[data-theme="dark"] .messages .success { background-color: #16a34a !important; }
-html[data-theme="dark"] .messages .error { background-color: #f43f5e !important; }
-
-html[data-theme="dark"] .btn-primary { background: #3b82f6 !important; color: #0b1220 !important; border: none !important; }
-html[data-theme="dark"] .btn-secondary { background: #64748b !important; color: #0b1220 !important; border: none !important; }
-html[data-theme="dark"] .btn-danger { background: #ef4444 !important; color: #ffffff !important; border: none !important; }
-
-html[data-theme="dark"] input[type="text"],
-html[data-theme="dark"] input[type="search"],
-html[data-theme="dark"] input[type="email"],
-html[data-theme="dark"] input[type="password"],
-html[data-theme="dark"] select {
-  background: #0f172a !important;
-  color: #e5e7eb !important;
-  border: 1px solid #1f2a44 !important;
+/* === STYLIZACJA ODPOWIEDZI W QUIZIE (nadpisanie Bootstrapa) === */
+.btn-check:checked + .btn-outline-primary {
+    background-color: rgba(79, 70, 229, 0.1) !important; /* Tło po zaznaczeniu */
+    color: var(--primary) !important;
+    border-color: var(--primary) !important;
+    font-weight: bold;
+    box-shadow: 0 0 0 2px var(--primary) inset;
 }
 
+/* Drobne poprawki dla tekstu w ciemnym motywie */
+:root[data-theme="dark"] .text-muted {
+    color: #94a3b8 !important;
+}
+:root[data-theme="dark"] .text-dark {
+    color: #f1f5f9 !important;
+}
