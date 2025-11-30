@@ -2,10 +2,33 @@
 from django.db import models
 from django.conf import settings
 
+class QuizGroup(models.Model):
+    name = models.CharField(max_length=100, verbose_name="Nazwa grupy")
+    owner = models.ForeignKey(
+        settings.AUTH_USER_MODEL, 
+        on_delete=models.CASCADE, 
+        related_name='owned_groups',
+        verbose_name="Właściciel"
+    )
+    members = models.ManyToManyField(
+        settings.AUTH_USER_MODEL,
+        related_name='group_memberships',
+        verbose_name="Członkowie grupy"
+    )
+
+    def __str__(self):
+        return self.name
+
+    class Meta:
+        verbose_name = "Grupa użytkowników"
+        verbose_name_plural = "Grupy użytkowników"
+        ordering = ['name']
+
 class Quiz(models.Model):
     class Visibility(models.TextChoices):
         PUBLIC = 'PUBLIC', 'Publiczny'
         PRIVATE = 'PRIVATE', 'Prywatny'
+    
     title = models.CharField(max_length=255)
     author = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     visibility = models.CharField(max_length=10, choices=Visibility.choices, default=Visibility.PRIVATE)
@@ -16,14 +39,19 @@ class Quiz(models.Model):
         help_text="Ustaw 0, aby wyłączyć limit czasu."
     )
     
-    # --- NOWE POLE ---
     shared_with = models.ManyToManyField(
         settings.AUTH_USER_MODEL,
-        related_name='shared_quizzes', # Umożliwia user.shared_quizzes.all()
-        blank=True, # Udostępnianie jest opcjonalne
-        verbose_name="Udostępnij dla"
+        related_name='shared_quizzes',
+        blank=True,
+        verbose_name="Udostępnij dla (użytkownicy)"
     )
-    # -----------------
+
+    shared_groups = models.ManyToManyField(
+        QuizGroup,
+        related_name='shared_quizzes',
+        blank=True,
+        verbose_name="Udostępnij dla (grupy)"
+    )
 
     def __str__(self): return self.title
 

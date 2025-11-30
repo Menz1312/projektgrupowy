@@ -1,22 +1,44 @@
 # quizzes/forms.py
 from django import forms
-from .models import Quiz, Question, Answer
+from .models import Quiz, Question, Answer, QuizGroup
 from django.forms import inlineformset_factory
 from django.contrib.auth import get_user_model
 
 User = get_user_model()
+
+class QuizGroupForm(forms.ModelForm):
+    members = forms.ModelMultipleChoiceField(
+        queryset=User.objects.none(), # Zostanie nadpisane w widoku
+        widget=forms.CheckboxSelectMultiple,
+        required=False,
+        label="Wybierz członków grupy"
+    )
+
+    class Meta:
+        model = QuizGroup
+        fields = ['name', 'members']
+        widgets = {
+            'name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'np. Klasa 3B'}),
+        }
 
 class QuizForm(forms.ModelForm):
     shared_with = forms.ModelMultipleChoiceField(
         queryset=User.objects.none(),
         widget=forms.CheckboxSelectMultiple,
         required=False,
-        label="Udostępnij użytkownikom"
+        label="Udostępnij użytkownikom (pojedynczo)"
+    )
+
+    shared_groups = forms.ModelMultipleChoiceField(
+        queryset=QuizGroup.objects.none(), # Zostanie nadpisane w widoku
+        widget=forms.CheckboxSelectMultiple,
+        required=False,
+        label="Udostępnij całym grupom"
     )
 
     class Meta:
         model = Quiz
-        fields = ['title', 'visibility', 'time_limit', 'shared_with']
+        fields = ['title', 'visibility', 'time_limit', 'shared_groups', 'shared_with'] # Dodane shared_groups
         labels = {
             'title': 'Tytuł Quizu',
             'visibility': 'Widoczność',

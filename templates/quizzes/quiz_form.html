@@ -46,6 +46,22 @@
       </div>
       <small style="display: block; opacity: 0.7;">Wybierz, którzy użytkownicy mogą zobaczyć ten quiz, jeśli jest ustawiony jako "Prywatny".</small>
     </div>
+
+    <div class="mb-3">
+      <label class="form-label">{{ quiz_form.shared_groups.label }}</label>
+      {% for e in quiz_form.shared_groups.errors %}<div class="text-danger">{{ e }}</div>{% endfor %}
+      
+      {% if quiz_form.shared_groups.field.queryset.exists %}
+          <div style="max-height: 200px; overflow-y: auto; border: 1px solid var(--border); padding: 10px; border-radius: 4px;">
+            {{ quiz_form.shared_groups }}
+          </div>
+          <small style="display: block; opacity: 0.7;">Zaznacz grupy, którym chcesz udostępnić ten quiz.</small>
+      {% else %}
+          <div class="alert alert-secondary py-2">
+              <small>Nie masz jeszcze żadnych grup. <a href="{% url 'group-create' %}">Stwórz nową grupę</a>, aby udostępniać quizy hurtowo.</small>
+          </div>
+      {% endif %}
+    </div>
     <button type="submit" class="btn btn-primary">
       {% if is_new %}Utwórz i przejdź do dodawania pytań{% else %}Zapisz zmiany w quizie{% endif %}
     </button>
