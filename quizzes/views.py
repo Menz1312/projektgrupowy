@@ -21,6 +21,8 @@ from .forms import QuizForm, QuestionForm, AnswerFormSet, QuizGenerationForm
 from .models import Quiz, Question, Answer, QuizAttempt, QuizGroup # Dodaj QuizGroup
 from .forms import QuizForm, QuestionForm, AnswerFormSet, QuizGenerationForm, QuizGroupForm # Dodaj QuizGroupForm
 
+from django.db.models import Q
+
 User = get_user_model()
 
 # Załaduj zmienne z pliku .env
@@ -115,7 +117,13 @@ def quiz_detail_view(request, pk):
 @login_required
 def my_quizzes_view(request):
     quizzes = Quiz.objects.filter(author=request.user)
-    shared_quizzes = request.user.shared_quizzes.all() 
+    
+    # ZMIANA: Pobieramy quizy udostępnione bezpośrednio LUB przez grupę
+    # Używamy distinct(), aby uniknąć duplikatów (jeśli np. udostępniono i userowi i jego grupie)
+    shared_quizzes = Quiz.objects.filter(
+        Q(shared_with=request.user) | 
+        Q(shared_groups__members=request.user)
+    ).distinct()
     
     return render(request, 'quizzes/my_quizzes.html', {
         'quizzes': quizzes,
