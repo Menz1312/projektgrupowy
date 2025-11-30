@@ -19,56 +19,82 @@
       <div class="alert alert-danger">{{ quiz_form.non_field_errors }}</div>
     {% endif %}
 
-    <div class="mb-3">
-      <label for="{{ quiz_form.title.id_for_label }}" class="form-label">Tytuł</label>
-      {{ quiz_form.title }}
-      {% for e in quiz_form.title.errors %}<div class="text-danger">{{ e }}</div>{% endfor %}
+    <div class="row">
+        <div class="col-md-6 mb-3">
+            <label class="form-label">Tytuł</label>
+            {{ quiz_form.title }}
+            {{ quiz_form.title.errors }}
+        </div>
+        <div class="col-md-3 mb-3">
+            <label class="form-label">Widoczność</label>
+            {{ quiz_form.visibility }}
+        </div>
+        <div class="col-md-3 mb-3">
+            <label class="form-label">Limit czasu (min)</label>
+            {{ quiz_form.time_limit }}
+        </div>
     </div>
 
-    <div class="mb-3">
-      <label for="{{ quiz_form.visibility.id_for_label }}" class="form-label">Widoczność</label>
-      {% for e in quiz_form.visibility.errors %}<div class="text-danger">{{ e }}</div>{% endfor %}
-      {{ quiz_form.visibility }}
-    </div>
-
-    <div class="mb-3">
-      <label for="{{ quiz_form.time_limit.id_for_label }}" class="form-label">{{ quiz_form.time_limit.label }}</label>
-      {{ quiz_form.time_limit }}
-      <small style="display: block; opacity: 0.7;">{{ quiz_form.time_limit.help_text }}</small>
-      {% for e in quiz_form.time_limit.errors %}<div class="text-danger">{{ e }}</div>{% endfor %}
-    </div>
+    <hr>
+    <h4>Udostępnianie użytkownikom</h4>
+    <p class="text-muted small">Wybierz użytkownika i przypisz mu rolę (Tylko rozwiązywanie lub Edycja).</p>
     
-    <div class="mb-3">
-      <label class="form-label">{{ quiz_form.shared_with.label }}</label>
-      {% for e in quiz_form.shared_with.errors %}<div class="text-danger">{{ e }}</div>{% endfor %}
-      <div style="max-height: 200px; overflow-y: auto; border: 1px solid var(--border); padding: 10px; border-radius: 4px;">
-        {{ quiz_form.shared_with }}
-      </div>
-      <small style="display: block; opacity: 0.7;">Wybierz, którzy użytkownicy mogą zobaczyć ten quiz, jeśli jest ustawiony jako "Prywatny".</small>
+    {{ user_perms_formset.management_form }}
+    <div id="user-perms-container">
+        {% for form in user_perms_formset %}
+            <div class="perm-row input-group mb-2">
+                {{ form.id }}
+                <span class="input-group-text"><i class="bi bi-person"></i></span>
+                {{ form.user }}
+                {{ form.role }}
+                {% if user_perms_formset.can_delete %}
+                    <div class="input-group-text bg-light">
+                        Usuń? {{ form.DELETE }}
+                    </div>
+                {% endif %}
+            </div>
+            {% if form.errors %}<div class="text-danger small mb-2">{{ form.errors }}</div>{% endif %}
+        {% endfor %}
     </div>
-
-    <div class="mb-3">
-      <label class="form-label">{{ quiz_form.shared_groups.label }}</label>
-      {% for e in quiz_form.shared_groups.errors %}<div class="text-danger">{{ e }}</div>{% endfor %}
-      
-      {% if quiz_form.shared_groups.field.queryset.exists %}
-          <div style="max-height: 200px; overflow-y: auto; border: 1px solid var(--border); padding: 10px; border-radius: 4px;">
-            {{ quiz_form.shared_groups }}
-          </div>
-          <small style="display: block; opacity: 0.7;">Zaznacz grupy, którym chcesz udostępnić ten quiz.</small>
-      {% else %}
-          <div class="alert alert-secondary py-2">
-              <small>Nie masz jeszcze żadnych grup. <a href="{% url 'group-create' %}">Stwórz nową grupę</a>, aby udostępniać quizy hurtowo.</small>
-          </div>
-      {% endif %}
-    </div>
-    <button type="submit" class="btn btn-primary">
-      {% if is_new %}Utwórz i przejdź do dodawania pytań{% else %}Zapisz zmiany w quizie{% endif %}
+    <button type="button" class="btn btn-sm btn-outline-secondary mb-4" id="add-user-perm">
+        <i class="bi bi-plus"></i> Dodaj użytkownika
     </button>
 
-    {% if not is_new and quiz %}
-      <a class="btn btn-secondary" href="{% url 'question-create' quiz_pk=quiz.pk %}">Dodaj pytanie ręcznie</a>
-      <a class="btn btn-danger" href="{% url 'quiz-delete' pk=quiz.pk %}">Usuń quiz</a>
+    <hr>
+    <h4>Udostępnianie grupom</h4>
+    <p class="text-muted small">Wybierz grupę i przypisz jej rolę.</p>
+
+    {{ group_perms_formset.management_form }}
+    <div id="group-perms-container">
+        {% for form in group_perms_formset %}
+            <div class="perm-row input-group mb-2">
+                {{ form.id }}
+                <span class="input-group-text"><i class="bi bi-people"></i></span>
+                {{ form.group }}
+                {{ form.role }}
+                {% if group_perms_formset.can_delete %}
+                    <div class="input-group-text bg-light">
+                        Usuń? {{ form.DELETE }}
+                    </div>
+                {% endif %}
+            </div>
+            {% if form.errors %}<div class="text-danger small mb-2">{{ form.errors }}</div>{% endif %}
+        {% endfor %}
+    </div>
+    <button type="button" class="btn btn-sm btn-outline-secondary mb-4" id="add-group-perm">
+        <i class="bi bi-plus"></i> Dodaj grupę
+    </button>
+
+    <div class="d-grid gap-2 mt-4">
+        <button type="submit" class="btn btn-primary btn-lg">
+            {% if is_new %}Utwórz quiz{% else %}Zapisz zmiany{% endif %}
+        </button>
+    </div>
+
+    {% if not is_new and quiz and quiz.author == user %}
+        <div class="mt-3 text-end">
+            <a class="btn btn-danger btn-sm" href="{% url 'quiz-delete' pk=quiz.pk %}">Usuń quiz</a>
+        </div>
     {% endif %}
   </form>
 
@@ -91,20 +117,82 @@
             <a href="{% url 'quiz-export-json' pk=quiz.pk %}" class="btn btn-secondary">Eksportuj wszystkie pytania do JSON</a>
         </div>
     </div>
-    <h3 style="margin-top:2rem;">Pytania w quizie</h3>
+
+    <hr class="my-5">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h3>Pytania</h3>
+        <div>
+            <a class="btn btn-success btn-sm" href="{% url 'question-create' quiz_pk=quiz.pk %}"><i class="bi bi-plus"></i> Dodaj pytanie</a>
+        </div>
+    </div>
+
     {% if quiz.questions.exists %}
-      <ol>
+      <div class="list-group">
         {% for q in quiz.questions.all %}
-          <li>
-            {{ q.text }}
-            · <a href="{% url 'question-edit' pk=q.pk %}">Edytuj</a>
-            · <a href="{% url 'question-delete' pk=q.pk %}">Usuń</a>
-          </li>
+          <div class="list-group-item d-flex justify-content-between align-items-center">
+            <div>
+                <strong>{{ forloop.counter }}.</strong> {{ q.text|truncatechars:80 }}
+                <span class="badge bg-secondary ms-2">{{ q.get_question_type_display }}</span>
+            </div>
+            <div class="btn-group">
+                <a href="{% url 'question-edit' pk=q.pk %}" class="btn btn-sm btn-outline-primary"><i class="bi bi-pencil"></i></a>
+                <a href="{% url 'question-delete' pk=q.pk %}" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></a>
+            </div>
+          </div>
         {% endfor %}
-      </ol>
+      </div>
     {% else %}
-      <p>Brak pytań. Dodaj je ręcznie, wygeneruj (jeśli dostępne) lub zaimportuj z pliku JSON.</p>
+      <div class="alert alert-info">Ten quiz nie ma jeszcze pytań.</div>
     {% endif %}
-    
   {% endif %}
+
+  <div style="display:none">
+      <div id="empty-user-form">
+          <div class="perm-row input-group mb-2">
+              {{ user_perms_formset.empty_form.id }}
+              <span class="input-group-text"><i class="bi bi-person"></i></span>
+              {{ user_perms_formset.empty_form.user }}
+              {{ user_perms_formset.empty_form.role }}
+              <div class="input-group-text bg-light">
+                  Usuń? {{ user_perms_formset.empty_form.DELETE }}
+              </div>
+          </div>
+      </div>
+      <div id="empty-group-form">
+          <div class="perm-row input-group mb-2">
+              {{ group_perms_formset.empty_form.id }}
+              <span class="input-group-text"><i class="bi bi-people"></i></span>
+              {{ group_perms_formset.empty_form.group }}
+              {{ group_perms_formset.empty_form.role }}
+              <div class="input-group-text bg-light">
+                  Usuń? {{ group_perms_formset.empty_form.DELETE }}
+              </div>
+          </div>
+      </div>
+  </div>
+
+  <script>
+    function addForm(prefix, containerId, emptyFormId) {
+        const totalForms = document.getElementById(`id_${prefix}-TOTAL_FORMS`);
+        const container = document.getElementById(containerId);
+        const emptyFormHtml = document.getElementById(emptyFormId).innerHTML;
+        
+        let count = parseInt(totalForms.value);
+        const newHtml = emptyFormHtml.replace(/__prefix__/g, count);
+        
+        const div = document.createElement('div');
+        div.innerHTML = newHtml;
+        container.appendChild(div.firstElementChild);
+        
+        totalForms.value = count + 1;
+    }
+
+    document.getElementById('add-user-perm').addEventListener('click', () => {
+        addForm('users', 'user-perms-container', 'empty-user-form');
+    });
+    
+    document.getElementById('add-group-perm').addEventListener('click', () => {
+        addForm('groups', 'group-perms-container', 'empty-group-form');
+    });
+  </script>
 {% endblock %}

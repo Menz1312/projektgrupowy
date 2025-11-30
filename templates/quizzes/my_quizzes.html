@@ -21,18 +21,8 @@
         <div class="col">
             <div class="card h-100 shadow-sm border-0">
                 <div class="card-body">
-                    <div class="d-flex justify-content-between align-items-start mb-2">
-                        <h5 class="card-title text-truncate" title="{{ quiz.title }}">{{ quiz.title }}</h5>
-                        {% if quiz.visibility == 'PUBLIC' %}
-                            <span class="badge bg-success">Publiczny</span>
-                        {% else %}
-                            <span class="badge bg-secondary">Prywatny</span>
-                        {% endif %}
-                    </div>
-                    <p class="card-text text-muted small">
-                        Liczba pytań: <strong>{{ quiz.questions.count }}</strong><br>
-                        Czas: <strong>{{ quiz.time_limit|default:"Brak" }} min</strong>
-                    </p>
+                    <h5 class="card-title text-truncate">{{ quiz.title }}</h5>
+                    <span class="badge bg-secondary">{{ quiz.get_visibility_display }}</span>
                 </div>
                 <div class="card-footer bg-white border-top-0 d-flex justify-content-between">
                     <a href="{% url 'quiz-detail' quiz.pk %}" class="btn btn-sm btn-outline-primary">Szczegóły</a>
@@ -46,12 +36,31 @@
         {% endfor %}
     </div>
 {% else %}
-    <div class="alert alert-light text-center py-5">
-        <p class="mb-0 text-muted">Nie stworzyłeś jeszcze żadnych quizów.</p>
+    <p class="text-muted mb-5">Brak utworzonych quizów.</p>
+{% endif %}
+
+{% if editable_quizzes %}
+<h4 class="text-muted mb-3 border-bottom pb-2">Udostępnione do edycji</h4>
+    <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4 mb-5">
+        {% for quiz in editable_quizzes %}
+        <div class="col">
+            <div class="card h-100 shadow-sm border-0 bg-light">
+                <div class="card-body">
+                    <h5 class="card-title">{{ quiz.title }}</h5>
+                    <span class="badge bg-info text-dark">Edytor</span>
+                    <p class="card-text small text-muted mt-2">Autor: {{ quiz.author.username }}</p>
+                </div>
+                <div class="card-footer bg-white border-top-0 d-flex justify-content-between">
+                    <a href="{% url 'quiz-detail' quiz.pk %}" class="btn btn-sm btn-outline-primary">Szczegóły</a>
+                    <a href="{% url 'quiz-edit' quiz.pk %}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-pencil"></i> Edytuj</a>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
     </div>
 {% endif %}
 
-<h4 class="text-muted mb-3 border-bottom pb-2 mt-4">Udostępnione dla mnie</h4>
+<h4 class="text-muted mb-3 border-bottom pb-2">Udostępnione do rozwiązania</h4>
 {% if shared_quizzes %}
     <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
         {% for quiz in shared_quizzes %}
@@ -59,9 +68,7 @@
             <div class="card h-100 border-dashed bg-light">
                 <div class="card-body">
                     <h5 class="card-title">{{ quiz.title }}</h5>
-                    <p class="card-text small text-muted">
-                        Autor: <i class="bi bi-person-circle"></i> {{ quiz.author.username }}
-                    </p>
+                    <p class="card-text small text-muted">Autor: {{ quiz.author.username }}</p>
                     <a href="{% url 'quiz-detail' quiz.pk %}" class="btn btn-primary btn-sm w-100">Rozwiąż</a>
                 </div>
             </div>

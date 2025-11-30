@@ -3,7 +3,7 @@ import json
 import requests
 import random
 import os
-from dotenv import load_dotenv  # <-- Nowy import
+from dotenv import load_dotenv
 
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
@@ -11,28 +11,21 @@ from django.contrib import messages
 from django.http import HttpResponse
 from django.utils.text import slugify
 from django.db import transaction
-from django.core.exceptions import ValidationError
+from django.core.exceptions import ValidationError, PermissionDenied
 from django.views.decorators.http import require_POST
 from django.contrib.auth import get_user_model
-
-from .models import Quiz, Question, Answer, QuizAttempt
-from .forms import QuizForm, QuestionForm, AnswerFormSet, QuizGenerationForm
-
-from .models import Quiz, Question, Answer, QuizAttempt, QuizGroup # Dodaj QuizGroup
-from .forms import QuizForm, QuestionForm, AnswerFormSet, QuizGenerationForm, QuizGroupForm # Dodaj QuizGroupForm
-
 from django.db.models import Q
 
-User = get_user_model()
+from .models import Quiz, Question, Answer, QuizAttempt, QuizGroup, QuizUserPermission, QuizGroupPermission
+from .forms import (
+    QuizForm, QuestionForm, AnswerFormSet, QuizGenerationForm, QuizGroupForm,
+    QuizUserPermissionFormSet, QuizGroupPermissionFormSet
+)
 
-# Załaduj zmienne z pliku .env
+User = get_user_model()
 load_dotenv()
 
-# --- KONFIGURACJA HUGGING FACE ---
-# Pobieramy token z bezpiecznego pliku .env
 HF_TOKEN = os.getenv("HF_TOKEN")
-
-# Nowy, uniwersalny endpoint routera (zgodny z OpenAI)
 HF_API_URL = "https://router.huggingface.co/v1/chat/completions"
 
 def home_view(request):
@@ -41,18 +34,13 @@ def home_view(request):
     return render(request, 'home.html', {'quizzes': quizzes})
 
 def _can_view_quiz(user, quiz):
-    """Zaktualizowana logika sprawdzania uprawnień"""
-    if quiz.visibility == 'PUBLIC':
-        return True
-    if not user.is_authenticated:
-        return False
-    if quiz.author == user:
-        return True
-    if quiz.shared_with.filter(pk=user.pk).exists():
-        return True
-    if quiz.shared_groups.filter(members=user).exists():
-        return True
-    return False
+    """Metoda pomocnicza - wrapper na metodę z modelu"""
+    return quiz.can_view(user)
+
+def _check_edit_permission(user, quiz):
+    """Rzuca wyjątek, jeśli użytkownik nie może edytować quizu"""
+    if not quiz.can_edit(user):
+        raise PermissionDenied("Nie masz uprawnień do edycji tego quizu.")
 
 @login_required
 def group_list_view(request):
@@ -63,7 +51,6 @@ def group_list_view(request):
 def group_create_view(request):
     if request.method == 'POST':
         form = QuizGroupForm(request.POST)
-        # Filtrujemy użytkowników, żeby nie dodać siebie
         form.fields['members'].queryset = User.objects.exclude(pk=request.user.pk)
         
         if form.is_valid():
@@ -108,7 +95,7 @@ def group_delete_view(request, pk):
 
 def quiz_detail_view(request, pk):
     quiz = get_object_or_404(Quiz, pk=pk)
-    if _can_view_quiz(request.user, quiz):
+    if quiz.can_view(request.user):
         return render(request, 'quizzes/quiz_detail.html', {'quiz': quiz})
     
     messages.error(request, "Nie masz uprawnień do wyświetlenia tego quizu.")
@@ -116,21 +103,96 @@ def quiz_detail_view(request, pk):
 
 @login_required
 def my_quizzes_view(request):
-    quizzes = Quiz.objects.filter(author=request.user)
+    # 1. Quizy autorskie
+    created_quizzes = Quiz.objects.filter(author=request.user)
     
-    # ZMIANA: Pobieramy quizy udostępnione bezpośrednio LUB przez grupę
-    # Używamy distinct(), aby uniknąć duplikatów (jeśli np. udostępniono i userowi i jego grupie)
+    # Pobierz grupy użytkownika dla zoptymalizowanych zapytań
+    user_groups = request.user.group_memberships.all()
+
+    # 2. Quizy, w których jestem edytorem (bezpośrednio LUB przez grupę z rolą EDITOR)
+    # Wykluczamy te, których jestem autorem
+    editable_quizzes = Quiz.objects.filter(
+        Q(quizuserpermission__user=request.user, quizuserpermission__role='EDITOR') |
+        Q(quizgrouppermission__group__in=user_groups, quizgrouppermission__role='EDITOR')
+    ).exclude(author=request.user).distinct()
+
+    # 3. Quizy tylko do odczytu
+    # Wykluczamy te, które już są w created lub editable
     shared_quizzes = Quiz.objects.filter(
-        Q(shared_with=request.user) | 
-        Q(shared_groups__members=request.user)
-    ).distinct()
+        Q(quizuserpermission__user=request.user) | 
+        Q(quizgrouppermission__group__in=user_groups)
+    ).exclude(pk__in=created_quizzes).exclude(pk__in=editable_quizzes).distinct()
     
     return render(request, 'quizzes/my_quizzes.html', {
-        'quizzes': quizzes,
+        'quizzes': created_quizzes,
+        'editable_quizzes': editable_quizzes,
         'shared_quizzes': shared_quizzes
     })
 
-# --- WIDOK GENEROWANIA (ZAKTUALIZOWANY URL I MODEL) ---
+@login_required
+def quiz_create_view(request):
+    if request.method == 'POST':
+        form = QuizForm(request.POST)
+        user_perms_formset = QuizUserPermissionFormSet(request.POST, prefix='users')
+        group_perms_formset = QuizGroupPermissionFormSet(request.POST, prefix='groups')
+        
+        if form.is_valid() and user_perms_formset.is_valid() and group_perms_formset.is_valid():
+            with transaction.atomic():
+                quiz = form.save(commit=False)
+                quiz.author = request.user
+                quiz.save()
+                
+                # Zapisujemy uprawnienia (Formsety)
+                user_perms_formset.instance = quiz
+                user_perms_formset.save()
+                
+                group_perms_formset.instance = quiz
+                group_perms_formset.save()
+                
+            messages.success(request, f"Quiz '{quiz.title}' został utworzony.")
+            return redirect('quiz-edit', pk=quiz.pk)
+    else:
+        form = QuizForm()
+        user_perms_formset = QuizUserPermissionFormSet(prefix='users')
+        group_perms_formset = QuizGroupPermissionFormSet(prefix='groups')
+
+    return render(request, 'quizzes/quiz_form.html', {
+        'quiz_form': form,
+        'user_perms_formset': user_perms_formset,
+        'group_perms_formset': group_perms_formset,
+        'is_new': True
+    })
+
+@login_required
+def quiz_edit_view(request, pk):
+    quiz = get_object_or_404(Quiz, pk=pk)
+    _check_edit_permission(request.user, quiz)
+    
+    if request.method == 'POST':
+        form = QuizForm(request.POST, instance=quiz)
+        user_perms_formset = QuizUserPermissionFormSet(request.POST, instance=quiz, prefix='users')
+        group_perms_formset = QuizGroupPermissionFormSet(request.POST, instance=quiz, prefix='groups')
+        
+        if form.is_valid() and user_perms_formset.is_valid() and group_perms_formset.is_valid():
+            with transaction.atomic():
+                form.save()
+                user_perms_formset.save()
+                group_perms_formset.save()
+                
+            messages.success(request, "Zapisano zmiany w quizie.")
+            return redirect('quiz-edit', pk=quiz.pk)
+    else:
+        form = QuizForm(instance=quiz)
+        user_perms_formset = QuizUserPermissionFormSet(instance=quiz, prefix='users')
+        group_perms_formset = QuizGroupPermissionFormSet(instance=quiz, prefix='groups')
+    
+    return render(request, 'quizzes/quiz_form.html', {
+        'quiz_form': form,
+        'user_perms_formset': user_perms_formset,
+        'group_perms_formset': group_perms_formset,
+        'quiz': quiz
+    })
+
 @login_required
 def quiz_generate_view(request):
     if request.method == 'POST':
@@ -140,7 +202,6 @@ def quiz_generate_view(request):
             count = form.cleaned_data['count']
             
             try:
-                # Sprawdzenie czy token został załadowany
                 if not HF_TOKEN:
                     raise ValueError("Brak klucza API (HF_TOKEN) w pliku .env")
 
@@ -175,7 +236,6 @@ def quiz_generate_view(request):
                 2. Wygeneruj dokładnie {count} pytań.
                 """
 
-                # Używamy modelu Llama-3-8B-Instruct, który jest szeroko dostępny w darmowym tierze
                 payload = {
                     "model": "meta-llama/Meta-Llama-3-8B-Instruct", 
                     "messages": [
@@ -203,7 +263,6 @@ def quiz_generate_view(request):
                 else:
                     raise ValueError(f"Pusta odpowiedź od modelu: {result}")
                 
-                # Czyszczenie markdowna
                 if "```json" in generated_text:
                     generated_text = generated_text.split("```json")[1].split("```")[0].strip()
                 elif "```" in generated_text:
@@ -266,53 +325,11 @@ def quiz_generate_view(request):
         form = QuizGenerationForm()
 
     return render(request, 'quizzes/quiz_generate.html', {'form': form})
-# -------------------------------------------------------
-
-@login_required
-def quiz_create_view(request):
-    if request.method == 'POST':
-        form = QuizForm(request.POST)
-        # Filtrujemy, aby pokazać tylko użytkowników innych niż my i nasze grupy
-        form.fields['shared_with'].queryset = User.objects.exclude(pk=request.user.pk)
-        form.fields['shared_groups'].queryset = QuizGroup.objects.filter(owner=request.user)
-        
-        if form.is_valid():
-            quiz = form.save(commit=False)
-            quiz.author = request.user
-            quiz.save()
-            form.save_m2m() # Zapisuje relacje ManyToMany (użytkownicy i grupy)
-            messages.success(request, f"Quiz '{quiz.title}' został utworzony.")
-            return redirect('quiz-edit', pk=quiz.pk)
-    else:
-        form = QuizForm()
-        form.fields['shared_with'].queryset = User.objects.exclude(pk=request.user.pk)
-        form.fields['shared_groups'].queryset = QuizGroup.objects.filter(owner=request.user)
-
-    return render(request, 'quizzes/quiz_form.html', {'quiz_form': form, 'is_new': True})
-
-@login_required
-def quiz_edit_view(request, pk):
-    quiz = get_object_or_404(Quiz, pk=pk, author=request.user)
-    
-    if request.method == 'POST':
-        form = QuizForm(request.POST, instance=quiz)
-        form.fields['shared_with'].queryset = User.objects.exclude(pk=request.user.pk)
-        form.fields['shared_groups'].queryset = QuizGroup.objects.filter(owner=request.user)
-        
-        if form.is_valid():
-            form.save()
-            messages.success(request, "Zapisano zmiany w quizie.")
-            return redirect('quiz-edit', pk=quiz.pk)
-    else:
-        form = QuizForm(instance=quiz)
-        form.fields['shared_with'].queryset = User.objects.exclude(pk=request.user.pk)
-        form.fields['shared_groups'].queryset = QuizGroup.objects.filter(owner=request.user)
-    
-    return render(request, 'quizzes/quiz_form.html', {'quiz_form': form, 'quiz': quiz})
 
 @login_required
 def question_create_view(request, quiz_pk):
-    quiz = get_object_or_404(Quiz, pk=quiz_pk, author=request.user)
+    quiz = get_object_or_404(Quiz, pk=quiz_pk)
+    _check_edit_permission(request.user, quiz)
     
     if request.method == 'POST':
         question_form = QuestionForm(request.POST)
@@ -350,7 +367,8 @@ def question_create_view(request, quiz_pk):
 
 @login_required
 def question_edit_view(request, pk):
-    question = get_object_or_404(Question, pk=pk, quiz__author=request.user)
+    question = get_object_or_404(Question, pk=pk)
+    _check_edit_permission(request.user, question.quiz)
     
     if request.method == 'POST':
         question_form = QuestionForm(request.POST, instance=question)
@@ -385,17 +403,18 @@ def question_edit_view(request, pk):
 
 @login_required
 def question_delete_view(request, pk):
-    question = get_object_or_404(Question, pk=pk, quiz__author=request.user)
-    quiz_pk = question.quiz.pk
+    question = get_object_or_404(Question, pk=pk)
+    _check_edit_permission(request.user, question.quiz)
     if request.method == 'POST':
+        quiz_pk = question.quiz.pk
         question.delete()
         messages.success(request, "Pytanie zostało usunięte.")
         return redirect('quiz-edit', pk=quiz_pk)
-    
     return render(request, 'quizzes/question_confirm_delete.html', {'question': question})
 
 @login_required
 def quiz_delete_view(request, pk):
+    # Usuwać quiz może tylko autor
     quiz = get_object_or_404(Quiz, pk=pk, author=request.user)
     if request.method == 'POST':
         quiz.delete()
@@ -492,7 +511,9 @@ def quiz_take_view(request, pk):
 
 @login_required
 def quiz_export_json_view(request, pk):
-    quiz = get_object_or_404(Quiz, pk=pk, author=request.user)
+    quiz = get_object_or_404(Quiz, pk=pk)
+    _check_edit_permission(request.user, quiz)
+
     questions_data = []
     for q in quiz.questions.prefetch_related('answers'):
         answers_data = [
@@ -518,7 +539,8 @@ def quiz_export_json_view(request, pk):
 @require_POST
 @transaction.atomic
 def quiz_import_json_view(request, pk):
-    quiz = get_object_or_404(Quiz, pk=pk, author=request.user)
+    quiz = get_object_or_404(Quiz, pk=pk)
+    _check_edit_permission(request.user, quiz)
     
     if 'json_file' not in request.FILES:
         messages.error(request, "Nie wybrano pliku.")
