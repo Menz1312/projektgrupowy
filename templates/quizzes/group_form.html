@@ -1,0 +1,28 @@
+{% extends 'base.html' %}
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+    <a href="{% url 'group-list' %}">&larr; Wróć do listy grup</a>
+    <h1 class="mt-2">{{ title }}</h1>
+
+    <form method="post" class="mt-4">
+        {% csrf_token %}
+        
+        <div class="mb-3">
+            <label class="form-label fw-bold">{{ form.name.label }}</label>
+            {{ form.name }}
+            {{ form.name.errors }}
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label fw-bold">{{ form.members.label }}</label>
+            <div style="max-height: 300px; overflow-y: auto; border: 1px solid var(--border); padding: 15px; border-radius: 8px; background: var(--bg);">
+                {{ form.members }}
+            </div>
+            <div class="form-text">Zaznacz użytkowników, którzy mają należeć do tej grupy.</div>
+            {{ form.members.errors }}
+        </div>
+
+        <button type="submit" class="btn btn-primary">Zapisz grupę</button>
+    </form>
+{% endblock %}

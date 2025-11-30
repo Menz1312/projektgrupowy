@@ -18,6 +18,9 @@ from django.contrib.auth import get_user_model
 from .models import Quiz, Question, Answer, QuizAttempt
 from .forms import QuizForm, QuestionForm, AnswerFormSet, QuizGenerationForm
 
+from .models import Quiz, Question, Answer, QuizAttempt, QuizGroup # Dodaj QuizGroup
+from .forms import QuizForm, QuestionForm, AnswerFormSet, QuizGenerationForm, QuizGroupForm # Dodaj QuizGroupForm
+
 User = get_user_model()
 
 # Załaduj zmienne z pliku .env
@@ -36,6 +39,7 @@ def home_view(request):
     return render(request, 'home.html', {'quizzes': quizzes})
 
 def _can_view_quiz(user, quiz):
+    """Zaktualizowana logika sprawdzania uprawnień"""
     if quiz.visibility == 'PUBLIC':
         return True
     if not user.is_authenticated:
@@ -44,7 +48,61 @@ def _can_view_quiz(user, quiz):
         return True
     if quiz.shared_with.filter(pk=user.pk).exists():
         return True
+    if quiz.shared_groups.filter(members=user).exists():
+        return True
     return False
+
+@login_required
+def group_list_view(request):
+    groups = QuizGroup.objects.filter(owner=request.user)
+    return render(request, 'quizzes/group_list.html', {'groups': groups})
+
+@login_required
+def group_create_view(request):
+    if request.method == 'POST':
+        form = QuizGroupForm(request.POST)
+        # Filtrujemy użytkowników, żeby nie dodać siebie
+        form.fields['members'].queryset = User.objects.exclude(pk=request.user.pk)
+        
+        if form.is_valid():
+            group = form.save(commit=False)
+            group.owner = request.user
+            group.save()
+            form.save_m2m()
+            messages.success(request, f"Grupa '{group.name}' została utworzona.")
+            return redirect('group-list')
+    else:
+        form = QuizGroupForm()
+        form.fields['members'].queryset = User.objects.exclude(pk=request.user.pk)
+    
+    return render(request, 'quizzes/group_form.html', {'form': form, 'title': 'Nowa grupa'})
+
+@login_required
+def group_edit_view(request, pk):
+    group = get_object_or_404(QuizGroup, pk=pk, owner=request.user)
+    
+    if request.method == 'POST':
+        form = QuizGroupForm(request.POST, instance=group)
+        form.fields['members'].queryset = User.objects.exclude(pk=request.user.pk)
+        
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Zaktualizowano grupę.")
+            return redirect('group-list')
+    else:
+        form = QuizGroupForm(instance=group)
+        form.fields['members'].queryset = User.objects.exclude(pk=request.user.pk)
+        
+    return render(request, 'quizzes/group_form.html', {'form': form, 'title': f'Edycja grupy: {group.name}'})
+
+@login_required
+def group_delete_view(request, pk):
+    group = get_object_or_404(QuizGroup, pk=pk, owner=request.user)
+    if request.method == 'POST':
+        group.delete()
+        messages.success(request, "Grupa została usunięta.")
+        return redirect('group-list')
+    return render(request, 'quizzes/group_confirm_delete.html', {'group': group})
 
 def quiz_detail_view(request, pk):
     quiz = get_object_or_404(Quiz, pk=pk)
@@ -206,18 +264,21 @@ def quiz_generate_view(request):
 def quiz_create_view(request):
     if request.method == 'POST':
         form = QuizForm(request.POST)
+        # Filtrujemy, aby pokazać tylko użytkowników innych niż my i nasze grupy
         form.fields['shared_with'].queryset = User.objects.exclude(pk=request.user.pk)
+        form.fields['shared_groups'].queryset = QuizGroup.objects.filter(owner=request.user)
         
         if form.is_valid():
             quiz = form.save(commit=False)
             quiz.author = request.user
             quiz.save()
-            form.save_m2m()
+            form.save_m2m() # Zapisuje relacje ManyToMany (użytkownicy i grupy)
             messages.success(request, f"Quiz '{quiz.title}' został utworzony.")
             return redirect('quiz-edit', pk=quiz.pk)
     else:
         form = QuizForm()
         form.fields['shared_with'].queryset = User.objects.exclude(pk=request.user.pk)
+        form.fields['shared_groups'].queryset = QuizGroup.objects.filter(owner=request.user)
 
     return render(request, 'quizzes/quiz_form.html', {'quiz_form': form, 'is_new': True})
 
@@ -228,6 +289,7 @@ def quiz_edit_view(request, pk):
     if request.method == 'POST':
         form = QuizForm(request.POST, instance=quiz)
         form.fields['shared_with'].queryset = User.objects.exclude(pk=request.user.pk)
+        form.fields['shared_groups'].queryset = QuizGroup.objects.filter(owner=request.user)
         
         if form.is_valid():
             form.save()
@@ -236,6 +298,7 @@ def quiz_edit_view(request, pk):
     else:
         form = QuizForm(instance=quiz)
         form.fields['shared_with'].queryset = User.objects.exclude(pk=request.user.pk)
+        form.fields['shared_groups'].queryset = QuizGroup.objects.filter(owner=request.user)
     
     return render(request, 'quizzes/quiz_form.html', {'quiz_form': form, 'quiz': quiz})
 
