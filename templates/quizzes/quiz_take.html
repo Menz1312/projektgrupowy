@@ -5,7 +5,7 @@
 
 {% block content %}
 <style>
-    /* Style zaadaptowane z awwwquiz, ale używające zmiennych z projektgrupowy */
+    /* Kontener Quizu */
     .quiz-container {
         background-color: var(--surface);
         border: 1px solid var(--border);
@@ -42,6 +42,7 @@
         gap: 0.8rem;
     }
 
+    /* Stylizacja odpowiedzi */
     .answer-option {
         background-color: var(--bg);
         border: 1px solid var(--border);
@@ -53,22 +54,23 @@
         transition: all 0.2s ease;
         position: relative;
         font-size: 1rem;
+        user-select: none;
     }
 
-    .answer-option:hover {
+    .answer-option:hover:not(.disabled) {
         background-color: var(--surface-hover);
         border-color: var(--primary);
     }
 
     .answer-option.selected {
-        background-color: rgba(79, 70, 229, 0.1); /* Lekki primary */
+        background-color: rgba(79, 70, 229, 0.1);
         border-color: var(--primary);
         color: var(--primary);
         font-weight: 600;
         box-shadow: 0 0 0 1px var(--primary);
     }
 
-    /* Checkbox/Radio fake UI inside option */
+    /* Ikonka wyboru (kółko/kwadrat) */
     .answer-option::before {
         content: '';
         display: inline-block;
@@ -76,21 +78,65 @@
         height: 18px;
         margin-right: 12px;
         border: 2px solid var(--text-muted);
-        border-radius: 50%; /* Radio style default */
+        border-radius: 50%; /* Domyślnie radio */
         vertical-align: middle;
         transition: all 0.2s;
     }
     
     .answer-option[data-type="MULTIPLE"]::before {
-        border-radius: 4px; /* Checkbox style */
+        border-radius: 4px; /* Checkbox */
     }
 
     .answer-option.selected::before {
         background-color: var(--primary);
         border-color: var(--primary);
-        box-shadow: inset 0 0 0 3px var(--bg); /* create a dot/check effect */
+        box-shadow: inset 0 0 0 3px var(--bg);
     }
 
+    /* --- STYLE WYNIKÓW (z awwwquiz) --- */
+    
+    /* Poprawna (zielony) */
+    .answer-option.correct {
+        background-color: rgba(39, 174, 96, 0.2) !important;
+        border-color: #27ae60 !important;
+        color: #27ae60 !important;
+    }
+    .answer-option.correct::before {
+        background-color: #27ae60 !important;
+        border-color: #27ae60 !important;
+    }
+
+    /* Błędna (czerwony) */
+    .answer-option.incorrect {
+        background-color: rgba(231, 76, 60, 0.2) !important;
+        border-color: #e74c3c !important;
+        color: #e74c3c !important;
+    }
+    .answer-option.incorrect::before {
+        background-color: #e74c3c !important;
+        border-color: #e74c3c !important;
+    }
+
+    /* Przegapiona poprawna (żółty/pomarańczowy) - tylko dla MULTIPLE */
+    .answer-option.missing {
+        background-color: rgba(243, 156, 18, 0.15) !important;
+        border-color: #f39c12 !important;
+        color: #e67e22 !important; 
+    }
+    .answer-option.missing::after {
+        content: ' (Poprawna)';
+        font-size: 0.8rem;
+        opacity: 0.8;
+        float: right;
+    }
+
+    /* Zablokowane po sprawdzeniu */
+    .answer-option.disabled {
+        cursor: default;
+        opacity: 0.9;
+    }
+
+    /* Animacje */
     .fade-in {
         animation: fadeIn 0.4s ease-out;
     }
@@ -109,10 +155,7 @@
         font-weight: bold;
     }
     
-    /* Ukryty formularz, który przechowuje odpowiedzi */
-    #real-form {
-        display: none;
-    }
+    #real-form { display: none; }
 </style>
 
 <div class="quiz-container">
@@ -128,13 +171,12 @@
     <div id="question-container" class="fade-in">
         <div id="question-text">Ładowanie pytania...</div>
         <div id="question-type-hint" class="text-muted small mb-3"></div>
-        <div id="answers-container">
-            </div>
+        <div id="answers-container"></div>
     </div>
 
     <div class="mt-4 d-flex justify-content-between">
         <button id="prev-btn" class="btn btn-outline-secondary" disabled>Wstecz</button>
-        <button id="next-btn" class="btn btn-primary px-4">Dalej</button>
+        <button id="action-btn" class="btn btn-primary px-4">Dalej</button>
     </div>
 </div>
 
@@ -145,32 +187,35 @@
 </form>
 
 <script>
-    // --- DANE Z DJANGO ---
-    // Bezpieczne wczytanie JSONA
+    // --- KONFIGURACJA ---
     const quizData = JSON.parse('{{ questions_json|escapejs }}');
     const timeLimitSec = parseInt('{{ time_limit|default:"0" }}');
-
-    // --- ZMIENNE STANU ---
+    // Czy włączyć tryb natychmiastowego sprawdzania?
+    const instantFeedback = "{{ instant_feedback|yesno:'true,false' }}" === "true";
+    // --- STAN QUIZU ---
     let currentQuestionIndex = 0;
-    // Struktura przechowująca wybory: { questionId: [answerId, answerId], ... }
-    let userSelections = {}; 
+    let userSelections = {}; // { questionId: [answerId, ...] }
+    
+    // Status pytania w trybie instant: 'answering' lub 'checked'
+    // Służy do tego, żeby przycisk "Dalej" wiedział co robić
+    let currentQuestionState = 'answering'; 
 
     // --- ELEMENTY DOM ---
     const questionText = document.getElementById('question-text');
     const questionTypeHint = document.getElementById('question-type-hint');
     const answersContainer = document.getElementById('answers-container');
-    const nextBtn = document.getElementById('next-btn');
+    const actionBtn = document.getElementById('action-btn');
     const prevBtn = document.getElementById('prev-btn');
     const quizProgress = document.getElementById('quiz-progress');
     const questionContainer = document.getElementById('question-container');
     const hiddenInputsContainer = document.getElementById('hidden-inputs-container');
     const realForm = document.getElementById('real-form');
 
-    // --- INICJALIZACJA ---
+    // --- START ---
     function initQuiz() {
-        if (quizData.length === 0) {
-            questionText.textContent = "Brak pytań w tym quizie.";
-            nextBtn.style.display = 'none';
+        if (!quizData || quizData.length === 0) {
+            questionText.textContent = "Brak pytań.";
+            actionBtn.style.display = 'none';
             prevBtn.style.display = 'none';
             return;
         }
@@ -182,28 +227,24 @@
     function loadQuestion() {
         const currentQuestion = quizData[currentQuestionIndex];
         
-        // Animacja wejścia
+        // Reset widoku
+        currentQuestionState = 'answering'; 
+        updateActionButtonText();
+        
+        // Animacja
         questionContainer.classList.remove('fade-in');
-        void questionContainer.offsetWidth; // Trigger reflow
+        void questionContainer.offsetWidth; 
         questionContainer.classList.add('fade-in');
 
-        // Tekst pytania
+        // Teksty
         questionText.textContent = currentQuestion.text;
-        
-        // Podpowiedź o typie
-        if (currentQuestion.type === 'SINGLE') {
-            questionTypeHint.textContent = "(Wybierz jedną odpowiedź)";
-        } else {
-            questionTypeHint.textContent = "(Wybierz wszystkie poprawne odpowiedzi)";
-        }
-
-        // Licznik
+        questionTypeHint.textContent = currentQuestion.type === 'SINGLE' 
+            ? "(Wybierz jedną odpowiedź)" 
+            : "(Wybierz wszystkie poprawne odpowiedzi)";
         quizProgress.textContent = `Pytanie ${currentQuestionIndex + 1} z ${quizData.length}`;
 
-        // Czyszczenie i generowanie odpowiedzi
+        // Odpowiedzi
         answersContainer.innerHTML = '';
-        
-        // Pobierz aktualnie zaznaczone ID dla tego pytania (jeśli użytkownik cofnął)
         const currentSelections = userSelections[currentQuestion.id] || [];
 
         currentQuestion.answers.forEach(answer => {
@@ -211,44 +252,43 @@
             btn.classList.add('answer-option');
             btn.textContent = answer.text;
             btn.dataset.id = answer.id;
-            // Dodaj atrybut, aby CSS wiedział jaki kształt ikonki (koło/kwadrat)
-            btn.dataset.type = currentQuestion.type; 
+            btn.dataset.type = currentQuestion.type;
+            // Przechowujemy info o poprawności w atrybucie (dla trybu instant)
+            if (instantFeedback) {
+                btn.dataset.isCorrect = answer.is_correct ? 'true' : 'false';
+            }
 
-            // Przywróć zaznaczenie
             if (currentSelections.includes(answer.id)) {
                 btn.classList.add('selected');
             }
 
-            btn.addEventListener('click', () => toggleAnswer(currentQuestion, answer.id, btn));
+            btn.addEventListener('click', () => handleAnswerClick(currentQuestion, answer.id, btn));
             answersContainer.appendChild(btn);
         });
 
-        // Aktualizacja przycisków nawigacji
-        prevBtn.disabled = currentQuestionIndex === 0;
-        if (currentQuestionIndex === quizData.length - 1) {
-            nextBtn.textContent = 'Zakończ i wyślij';
-            nextBtn.classList.replace('btn-primary', 'btn-success');
-        } else {
-            nextBtn.textContent = 'Dalej';
-            nextBtn.classList.replace('btn-success', 'btn-primary');
-        }
+        // Wstecz tylko jeśli nie jesteśmy na 1 pytaniu i nie w trybie 'checked' (żeby nie mieszać)
+        prevBtn.disabled = (currentQuestionIndex === 0);
+        
+        // Jeśli wróciliśmy do pytania, które już było sprawdzone w trybie instant -> pokaż wyniki od razu
+        // (Opcjonalne, w najprostszej wersji resetujemy stan do 'answering' i pozwalamy poprawić przed wysłaniem, 
+        // ale jeśli 'instantFeedback' jest true, zazwyczaj nie pozwala się zmieniać zdania po sprawdzeniu. 
+        // Tutaj dla uproszczenia pozwalamy poprawić, chyba że zablokujemy. 
+        // W tej implementacji 'prev' pozwala cofnąć i zmienić.)
     }
 
-    // --- LOGIKA ZAZNACZANIA ---
-    function toggleAnswer(questionObj, answerId, btnElement) {
+    // --- OBSŁUGA KLIKNIĘCIA ODPOWIEDZI ---
+    function handleAnswerClick(questionObj, answerId, btnElement) {
+        // Jeśli pytanie już sprawdzone, blokujemy zmiany
+        if (instantFeedback && currentQuestionState === 'checked') return;
+
         let selections = userSelections[questionObj.id] || [];
 
         if (questionObj.type === 'SINGLE') {
-            // Jednokrotny wybór: odznacz wszystko inne, zaznacz to
             selections = [answerId];
-            
-            // UI Update
-            const allOptions = answersContainer.querySelectorAll('.answer-option');
-            allOptions.forEach(opt => opt.classList.remove('selected'));
+            answersContainer.querySelectorAll('.answer-option').forEach(opt => opt.classList.remove('selected'));
             btnElement.classList.add('selected');
-
         } else {
-            // Wielokrotny wybór: toggle
+            // MULTIPLE
             if (selections.includes(answerId)) {
                 selections = selections.filter(id => id !== answerId);
                 btnElement.classList.remove('selected');
@@ -257,13 +297,82 @@
                 btnElement.classList.add('selected');
             }
         }
-
-        // Zapisz w stanie globalnym
         userSelections[questionObj.id] = selections;
     }
 
-    // --- NAWIGACJA I WYSYŁANIE ---
-    nextBtn.addEventListener('click', () => {
+    // --- AKTUALIZACJA PRZYCISKU AKCJI ---
+    function updateActionButtonText() {
+        if (instantFeedback && currentQuestionState === 'answering') {
+            actionBtn.textContent = 'Sprawdź';
+            actionBtn.classList.replace('btn-success', 'btn-primary');
+        } else {
+            // Tryb normalny LUB tryb instant po sprawdzeniu
+            if (currentQuestionIndex === quizData.length - 1) {
+                actionBtn.textContent = 'Zakończ i wyślij';
+                actionBtn.classList.replace('btn-primary', 'btn-success');
+            } else {
+                actionBtn.textContent = 'Dalej';
+                actionBtn.classList.replace('btn-success', 'btn-primary');
+            }
+        }
+    }
+
+    // --- LOGIKA "SPRAWDŹ" (INSTANT FEEDBACK) ---
+    function checkAnswersInstant() {
+        const currentQuestion = quizData[currentQuestionIndex];
+        const selections = userSelections[currentQuestion.id] || [];
+        const options = answersContainer.querySelectorAll('.answer-option');
+
+        let anySelected = selections.length > 0;
+        if (!anySelected) {
+            alert("Wybierz odpowiedź przed sprawdzeniem!");
+            return;
+        }
+
+        options.forEach(opt => {
+            const isCorrect = opt.dataset.isCorrect === 'true';
+            const isSelected = opt.classList.contains('selected');
+            const type = currentQuestion.type;
+
+            opt.classList.add('disabled'); // Blokada klikania
+
+            if (isSelected) {
+                if (isCorrect) {
+                    opt.classList.add('correct'); // Zielony
+                } else {
+                    opt.classList.add('incorrect'); // Czerwony
+                }
+            } else {
+                // Niezaznaczone
+                if (isCorrect && type === 'MULTIPLE') {
+                    // W pytaniach wielokrotnego wyboru pokazujemy co pominięto
+                    opt.classList.add('missing'); // Żółty
+                }
+                // W SINGLE zazwyczaj nie pokazujemy poprawnej jeśli zaznaczono źle, 
+                // chyba że chcemy być bardzo pomocni. awwwquiz pokazywał 'missing' tylko przy correct=true.
+                if (isCorrect && type === 'SINGLE') {
+                     opt.classList.add('correct'); // Pokaż właściwą na zielono (opcjonalne)
+                     // w awwwquiz logika była: if (isCorrect) element.classList.add('missing'); 
+                     // Ale dla single choice lepiej dać green border lub missing. Zróbmy 'missing' dla spójności.
+                     if(!isSelected) opt.classList.add('missing');
+                }
+            }
+        });
+
+        // Zmiana stanu
+        currentQuestionState = 'checked';
+        updateActionButtonText();
+    }
+
+    // --- OBSŁUGA PRZYCISKU GŁÓWNEGO ---
+    actionBtn.addEventListener('click', () => {
+        // SCENARIUSZ 1: Tryb Instant, etap 'answering' -> Sprawdzamy
+        if (instantFeedback && currentQuestionState === 'answering') {
+            checkAnswersInstant();
+            return;
+        }
+
+        // SCENARIUSZ 2: Przejście do następnego (Tryb normalny LUB Instant po sprawdzeniu)
         if (currentQuestionIndex < quizData.length - 1) {
             currentQuestionIndex++;
             loadQuestion();
@@ -279,15 +388,10 @@
         }
     });
 
+    // --- WYSYŁKA ---
     function submitQuiz() {
-        // Zbuduj ukryte inputy na podstawie userSelections
         hiddenInputsContainer.innerHTML = '';
-
         for (const [qId, ansIds] of Object.entries(userSelections)) {
-            // Dla każdego zaznaczonego ID odpowiedzi stwórz input
-            // Django oczekuje: name="q_IDPYTANIA" value="IDODPOWIEDZI"
-            // Przy Checkboxach w Django wysyła się wiele inputów o tej samej nazwie.
-            
             ansIds.forEach(ansId => {
                 const input = document.createElement('input');
                 input.type = 'hidden';
@@ -296,15 +400,12 @@
                 hiddenInputsContainer.appendChild(input);
             });
         }
-
-        // Wyślij formularz
         realForm.submit();
     }
 
-    // --- TIMER (Opcjonalny) ---
+    // --- TIMER ---
     function startTimer() {
         if (timeLimitSec <= 0) return;
-
         let remaining = timeLimitSec;
         const display = document.getElementById('countdown');
         const timeOverInput = document.getElementById('time_over');
@@ -318,19 +419,16 @@
         const interval = setInterval(() => {
             remaining--;
             updateDisplay();
-
             if (remaining <= 0) {
                 clearInterval(interval);
                 timeOverInput.value = '1';
-                alert("Czas minął! Quiz zostanie wysłany automatycznie.");
+                alert("Czas minął!");
                 submitQuiz();
             }
         }, 1000);
-        
         updateDisplay();
     }
 
-    // Start
     initQuiz();
 </script>
 {% endblock %}

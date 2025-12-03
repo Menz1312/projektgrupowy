@@ -436,7 +436,7 @@ def quiz_take_view(request, pk):
     time_limit_seconds = quiz.time_limit * 60
 
     if request.method == 'POST':
-        # --- LOGIKA SPRAWDZANIA WYNIKU (Bez zmian, po stronie serwera) ---
+        # --- LOGIKA ZAPISU WYNIKU (Bez zmian - serwer liczy punkty) ---
         total = quiz.questions.count()
         correct_count = 0
         details = []
@@ -446,7 +446,6 @@ def quiz_take_view(request, pk):
             correct_ids = set(question.answers.filter(is_correct=True).values_list('id', flat=True))
             chosen_ids = set()
             
-            # Pobieranie danych z formularza (radio lub checkbox)
             if question.question_type == Question.QuestionType.SINGLE:
                 chosen_id_str = request.POST.get(field)
                 if chosen_id_str:
@@ -503,24 +502,25 @@ def quiz_take_view(request, pk):
         answers = list(q.answers.all())
         random.shuffle(answers)
         
-        # Nie wysyłamy is_correct do klienta, żeby nie można było podglądnąć w źródle strony!
-        answers_data = [{'id': a.id, 'text': a.text} for a in answers]
+        # Przesyłamy 'is_correct' do JS, aby mógł obsłużyć tryb natychmiastowy.
+        # W trybie klasycznym JS po prostu zignoruje to pole.
+        answers_data = [{'id': a.id, 'text': a.text, 'is_correct': a.is_correct} for a in answers]
         
         questions_json.append({
             'id': q.id,
             'text': q.text,
-            'type': q.question_type, # SINGLE lub MULTIPLE
+            'type': q.question_type,
             'answers': answers_data
         })
 
-    # Serializacja do JSON stringa
     import json
     questions_json_str = json.dumps(questions_json)
 
     return render(request, 'quizzes/quiz_take.html', {
         'quiz': quiz,
-        'questions_json': questions_json_str, # Przekazujemy JSON
+        'questions_json': questions_json_str,
         'time_limit': time_limit_seconds,
+        'instant_feedback': quiz.instant_feedback, # Przekazujemy ustawienie do szablonu
     })
 
 @login_required

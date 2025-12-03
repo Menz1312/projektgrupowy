@@ -24,15 +24,18 @@ class QuizGroupForm(forms.ModelForm):
 class QuizForm(forms.ModelForm):
     class Meta:
         model = Quiz
-        # Usuwamy shared_with, editors, shared_groups - będą obsługiwane przez Formsety
-        fields = ['title', 'visibility', 'time_limit']
+        # Dodaj 'instant_feedback' do listy poniżej:
+        fields = ['title', 'visibility', 'time_limit', 'instant_feedback']
+        
         labels = {
             'title': 'Tytuł Quizu',
             'visibility': 'Widoczność',
+            # instant_feedback weźmie etykietę z modelu (verbose_name)
         }
         widgets = {
             'time_limit': forms.NumberInput(attrs={'min': 0, 'step': 1}),
             'visibility': forms.RadioSelect,
+            # Dla pola BooleanField Django domyślnie wygeneruje Checkbox, co jest OK
         }
 
 # --- FORMSETY DLA UPRAWNIEŃ ---
