@@ -1,73 +1,336 @@
 {% extends 'base.html' %}
+{% load static %}
+
 {% block title %}{{ quiz.title }} – Rozwiąż{% endblock %}
+
 {% block content %}
-  <h1>{{ quiz.title }}</h1>
+<style>
+    /* Style zaadaptowane z awwwquiz, ale używające zmiennych z projektgrupowy */
+    .quiz-container {
+        background-color: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        box-shadow: var(--shadow);
+        padding: 2rem;
+        max-width: 800px;
+        margin: 0 auto;
+        text-align: center;
+        transition: background-color 0.3s, color 0.3s;
+    }
 
-  {% if time_limit and time_limit > 0 %}
-    <div style="margin: .5rem 0 1rem; padding:.5rem 1rem; border:1px solid #ddd; border-radius:8px;">
-      <strong>Pozostały czas:</strong> <span id="countdown"></span>
+    .progress-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1.5rem;
+        color: var(--text-muted);
+        font-weight: 500;
+        font-size: 0.9rem;
+    }
+
+    #question-text {
+        margin-bottom: 2rem;
+        font-size: 1.4rem;
+        font-weight: 600;
+        min-height: 3rem;
+        color: var(--text);
+    }
+
+    #answers-container {
+        display: flex;
+        flex-direction: column;
+        gap: 0.8rem;
+    }
+
+    .answer-option {
+        background-color: var(--bg);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        color: var(--text);
+        cursor: pointer;
+        padding: 1rem;
+        text-align: left;
+        transition: all 0.2s ease;
+        position: relative;
+        font-size: 1rem;
+    }
+
+    .answer-option:hover {
+        background-color: var(--surface-hover);
+        border-color: var(--primary);
+    }
+
+    .answer-option.selected {
+        background-color: rgba(79, 70, 229, 0.1); /* Lekki primary */
+        border-color: var(--primary);
+        color: var(--primary);
+        font-weight: 600;
+        box-shadow: 0 0 0 1px var(--primary);
+    }
+
+    /* Checkbox/Radio fake UI inside option */
+    .answer-option::before {
+        content: '';
+        display: inline-block;
+        width: 18px;
+        height: 18px;
+        margin-right: 12px;
+        border: 2px solid var(--text-muted);
+        border-radius: 50%; /* Radio style default */
+        vertical-align: middle;
+        transition: all 0.2s;
+    }
+    
+    .answer-option[data-type="MULTIPLE"]::before {
+        border-radius: 4px; /* Checkbox style */
+    }
+
+    .answer-option.selected::before {
+        background-color: var(--primary);
+        border-color: var(--primary);
+        box-shadow: inset 0 0 0 3px var(--bg); /* create a dot/check effect */
+    }
+
+    .fade-in {
+        animation: fadeIn 0.4s ease-out;
+    }
+
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+
+    .timer-badge {
+        background-color: var(--danger);
+        color: white;
+        padding: 0.3rem 0.8rem;
+        border-radius: 20px;
+        font-size: 0.9rem;
+        font-weight: bold;
+    }
+    
+    /* Ukryty formularz, który przechowuje odpowiedzi */
+    #real-form {
+        display: none;
+    }
+</style>
+
+<div class="quiz-container">
+    <div class="progress-header">
+        <span id="quiz-progress">Pytanie 1/?</span>
+        {% if time_limit and time_limit > 0 %}
+            <span id="timer-container" class="timer-badge">
+                <i class="bi bi-clock"></i> <span id="countdown">--:--</span>
+            </span>
+        {% endif %}
     </div>
-  {% endif %}
 
-  <form id="quiz-form" method="post">
+    <div id="question-container" class="fade-in">
+        <div id="question-text">Ładowanie pytania...</div>
+        <div id="question-type-hint" class="text-muted small mb-3"></div>
+        <div id="answers-container">
+            </div>
+    </div>
+
+    <div class="mt-4 d-flex justify-content-between">
+        <button id="prev-btn" class="btn btn-outline-secondary" disabled>Wstecz</button>
+        <button id="next-btn" class="btn btn-primary px-4">Dalej</button>
+    </div>
+</div>
+
+<form id="real-form" method="post">
     {% csrf_token %}
-    <input type="hidden" name="time_over" id="time_over" value="0" />
+    <input type="hidden" name="time_over" id="time_over" value="0">
+    <div id="hidden-inputs-container"></div>
+</form>
 
-    <ol>
-      {% for item in questions_data %}
-        <li style="margin-bottom:1rem;">
-          <p><strong>{{ item.q.text }}</strong></p>
+<script>
+    // --- DANE Z DJANGO ---
+    // Bezpieczne wczytanie JSONA
+    const quizData = JSON.parse('{{ questions_json|escapejs }}');
+    const timeLimitSec = parseInt('{{ time_limit|default:"0" }}');
 
-          {% for ans in item.answers %}
-            <label style="display:block; margin:.25rem 0;">
-              {% if item.q.question_type == 'SINGLE' %}
-                <input type="radio" name="q_{{ item.q.id }}" value="{{ ans.id }}"> {{ ans.text }}
-              {% else %}
-                <input type="checkbox" name="q_{{ item.q.id }}" value="{{ ans.id }}"> {{ ans.text }}
-              {% endif %}
-            </label>
-          {% endfor %}
+    // --- ZMIENNE STANU ---
+    let currentQuestionIndex = 0;
+    // Struktura przechowująca wybory: { questionId: [answerId, answerId], ... }
+    let userSelections = {}; 
 
-          {% if item.q.question_type == 'SINGLE' %}
-            <small style="opacity:.7;">(Zaznacz jedną poprawną odpowiedź)</small>
-          {% else %}
-            <small style="opacity:.7;">(Zaznacz wszystkie poprawne odpowiedzi)</small>
-          {% endif %}
-          </li>
-      {% endfor %}
-    </ol>
+    // --- ELEMENTY DOM ---
+    const questionText = document.getElementById('question-text');
+    const questionTypeHint = document.getElementById('question-type-hint');
+    const answersContainer = document.getElementById('answers-container');
+    const nextBtn = document.getElementById('next-btn');
+    const prevBtn = document.getElementById('prev-btn');
+    const quizProgress = document.getElementById('quiz-progress');
+    const questionContainer = document.getElementById('question-container');
+    const hiddenInputsContainer = document.getElementById('hidden-inputs-container');
+    const realForm = document.getElementById('real-form');
 
-    <button type="submit" class="btn btn-primary">Zakończ i pokaż wynik</button>
-  </form>
-
-  {% if time_limit and time_limit > 0 %}
-  <script>
-    (function(){
-      var limit = parseInt('{{ time_limit|default:"0" }}');
-      if (!limit) return;
-
-      var remaining = limit;
-      var el = document.getElementById('countdown');
-      var over = document.getElementById('time_over');
-      var form = document.getElementById('quiz-form');
-
-      function fmt(sec){
-        var m = Math.floor(sec/60), s = sec%60;
-        return m + ':' + (s<10 ? '0' : '') + s;
-      }
-      function tick(){
-        if (!el) return;
-        el.textContent = fmt(remaining);
-        if (remaining <= 0){
-          over.value = '1';
-          form.submit();
-          return;
+    // --- INICJALIZACJA ---
+    function initQuiz() {
+        if (quizData.length === 0) {
+            questionText.textContent = "Brak pytań w tym quizie.";
+            nextBtn.style.display = 'none';
+            prevBtn.style.display = 'none';
+            return;
         }
-        remaining -= 1;
-        setTimeout(tick, 1000);
-      }
-      tick();
-    })();
-  </script>
-  {% endif %}
+        loadQuestion();
+        startTimer();
+    }
+
+    // --- RENDEROWANIE PYTANIA ---
+    function loadQuestion() {
+        const currentQuestion = quizData[currentQuestionIndex];
+        
+        // Animacja wejścia
+        questionContainer.classList.remove('fade-in');
+        void questionContainer.offsetWidth; // Trigger reflow
+        questionContainer.classList.add('fade-in');
+
+        // Tekst pytania
+        questionText.textContent = currentQuestion.text;
+        
+        // Podpowiedź o typie
+        if (currentQuestion.type === 'SINGLE') {
+            questionTypeHint.textContent = "(Wybierz jedną odpowiedź)";
+        } else {
+            questionTypeHint.textContent = "(Wybierz wszystkie poprawne odpowiedzi)";
+        }
+
+        // Licznik
+        quizProgress.textContent = `Pytanie ${currentQuestionIndex + 1} z ${quizData.length}`;
+
+        // Czyszczenie i generowanie odpowiedzi
+        answersContainer.innerHTML = '';
+        
+        // Pobierz aktualnie zaznaczone ID dla tego pytania (jeśli użytkownik cofnął)
+        const currentSelections = userSelections[currentQuestion.id] || [];
+
+        currentQuestion.answers.forEach(answer => {
+            const btn = document.createElement('div');
+            btn.classList.add('answer-option');
+            btn.textContent = answer.text;
+            btn.dataset.id = answer.id;
+            // Dodaj atrybut, aby CSS wiedział jaki kształt ikonki (koło/kwadrat)
+            btn.dataset.type = currentQuestion.type; 
+
+            // Przywróć zaznaczenie
+            if (currentSelections.includes(answer.id)) {
+                btn.classList.add('selected');
+            }
+
+            btn.addEventListener('click', () => toggleAnswer(currentQuestion, answer.id, btn));
+            answersContainer.appendChild(btn);
+        });
+
+        // Aktualizacja przycisków nawigacji
+        prevBtn.disabled = currentQuestionIndex === 0;
+        if (currentQuestionIndex === quizData.length - 1) {
+            nextBtn.textContent = 'Zakończ i wyślij';
+            nextBtn.classList.replace('btn-primary', 'btn-success');
+        } else {
+            nextBtn.textContent = 'Dalej';
+            nextBtn.classList.replace('btn-success', 'btn-primary');
+        }
+    }
+
+    // --- LOGIKA ZAZNACZANIA ---
+    function toggleAnswer(questionObj, answerId, btnElement) {
+        let selections = userSelections[questionObj.id] || [];
+
+        if (questionObj.type === 'SINGLE') {
+            // Jednokrotny wybór: odznacz wszystko inne, zaznacz to
+            selections = [answerId];
+            
+            // UI Update
+            const allOptions = answersContainer.querySelectorAll('.answer-option');
+            allOptions.forEach(opt => opt.classList.remove('selected'));
+            btnElement.classList.add('selected');
+
+        } else {
+            // Wielokrotny wybór: toggle
+            if (selections.includes(answerId)) {
+                selections = selections.filter(id => id !== answerId);
+                btnElement.classList.remove('selected');
+            } else {
+                selections.push(answerId);
+                btnElement.classList.add('selected');
+            }
+        }
+
+        // Zapisz w stanie globalnym
+        userSelections[questionObj.id] = selections;
+    }
+
+    // --- NAWIGACJA I WYSYŁANIE ---
+    nextBtn.addEventListener('click', () => {
+        if (currentQuestionIndex < quizData.length - 1) {
+            currentQuestionIndex++;
+            loadQuestion();
+        } else {
+            submitQuiz();
+        }
+    });
+
+    prevBtn.addEventListener('click', () => {
+        if (currentQuestionIndex > 0) {
+            currentQuestionIndex--;
+            loadQuestion();
+        }
+    });
+
+    function submitQuiz() {
+        // Zbuduj ukryte inputy na podstawie userSelections
+        hiddenInputsContainer.innerHTML = '';
+
+        for (const [qId, ansIds] of Object.entries(userSelections)) {
+            // Dla każdego zaznaczonego ID odpowiedzi stwórz input
+            // Django oczekuje: name="q_IDPYTANIA" value="IDODPOWIEDZI"
+            // Przy Checkboxach w Django wysyła się wiele inputów o tej samej nazwie.
+            
+            ansIds.forEach(ansId => {
+                const input = document.createElement('input');
+                input.type = 'hidden';
+                input.name = `q_${qId}`;
+                input.value = ansId;
+                hiddenInputsContainer.appendChild(input);
+            });
+        }
+
+        // Wyślij formularz
+        realForm.submit();
+    }
+
+    // --- TIMER (Opcjonalny) ---
+    function startTimer() {
+        if (timeLimitSec <= 0) return;
+
+        let remaining = timeLimitSec;
+        const display = document.getElementById('countdown');
+        const timeOverInput = document.getElementById('time_over');
+
+        function updateDisplay() {
+            const m = Math.floor(remaining / 60);
+            const s = remaining % 60;
+            display.textContent = `${m}:${s < 10 ? '0' : ''}${s}`;
+        }
+
+        const interval = setInterval(() => {
+            remaining--;
+            updateDisplay();
+
+            if (remaining <= 0) {
+                clearInterval(interval);
+                timeOverInput.value = '1';
+                alert("Czas minął! Quiz zostanie wysłany automatycznie.");
+                submitQuiz();
+            }
+        }, 1000);
+        
+        updateDisplay();
+    }
+
+    // Start
+    initQuiz();
+</script>
 {% endblock %}
