@@ -1,73 +1,434 @@
 {% extends 'base.html' %}
+{% load static %}
+
 {% block title %}{{ quiz.title }} – Rozwiąż{% endblock %}
+
 {% block content %}
-  <h1>{{ quiz.title }}</h1>
+<style>
+    /* Kontener Quizu */
+    .quiz-container {
+        background-color: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        box-shadow: var(--shadow);
+        padding: 2rem;
+        max-width: 800px;
+        margin: 0 auto;
+        text-align: center;
+        transition: background-color 0.3s, color 0.3s;
+    }
 
-  {% if time_limit and time_limit > 0 %}
-    <div style="margin: .5rem 0 1rem; padding:.5rem 1rem; border:1px solid #ddd; border-radius:8px;">
-      <strong>Pozostały czas:</strong> <span id="countdown"></span>
+    .progress-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1.5rem;
+        color: var(--text-muted);
+        font-weight: 500;
+        font-size: 0.9rem;
+    }
+
+    #question-text {
+        margin-bottom: 2rem;
+        font-size: 1.4rem;
+        font-weight: 600;
+        min-height: 3rem;
+        color: var(--text);
+    }
+
+    #answers-container {
+        display: flex;
+        flex-direction: column;
+        gap: 0.8rem;
+    }
+
+    /* Stylizacja odpowiedzi */
+    .answer-option {
+        background-color: var(--bg);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        color: var(--text);
+        cursor: pointer;
+        padding: 1rem;
+        text-align: left;
+        transition: all 0.2s ease;
+        position: relative;
+        font-size: 1rem;
+        user-select: none;
+    }
+
+    .answer-option:hover:not(.disabled) {
+        background-color: var(--surface-hover);
+        border-color: var(--primary);
+    }
+
+    .answer-option.selected {
+        background-color: rgba(79, 70, 229, 0.1);
+        border-color: var(--primary);
+        color: var(--primary);
+        font-weight: 600;
+        box-shadow: 0 0 0 1px var(--primary);
+    }
+
+    /* Ikonka wyboru (kółko/kwadrat) */
+    .answer-option::before {
+        content: '';
+        display: inline-block;
+        width: 18px;
+        height: 18px;
+        margin-right: 12px;
+        border: 2px solid var(--text-muted);
+        border-radius: 50%; /* Domyślnie radio */
+        vertical-align: middle;
+        transition: all 0.2s;
+    }
+    
+    .answer-option[data-type="MULTIPLE"]::before {
+        border-radius: 4px; /* Checkbox */
+    }
+
+    .answer-option.selected::before {
+        background-color: var(--primary);
+        border-color: var(--primary);
+        box-shadow: inset 0 0 0 3px var(--bg);
+    }
+
+    /* --- STYLE WYNIKÓW (z awwwquiz) --- */
+    
+    /* Poprawna (zielony) */
+    .answer-option.correct {
+        background-color: rgba(39, 174, 96, 0.2) !important;
+        border-color: #27ae60 !important;
+        color: #27ae60 !important;
+    }
+    .answer-option.correct::before {
+        background-color: #27ae60 !important;
+        border-color: #27ae60 !important;
+    }
+
+    /* Błędna (czerwony) */
+    .answer-option.incorrect {
+        background-color: rgba(231, 76, 60, 0.2) !important;
+        border-color: #e74c3c !important;
+        color: #e74c3c !important;
+    }
+    .answer-option.incorrect::before {
+        background-color: #e74c3c !important;
+        border-color: #e74c3c !important;
+    }
+
+    /* Przegapiona poprawna (żółty/pomarańczowy) - tylko dla MULTIPLE */
+    .answer-option.missing {
+        background-color: rgba(243, 156, 18, 0.15) !important;
+        border-color: #f39c12 !important;
+        color: #e67e22 !important; 
+    }
+    .answer-option.missing::after {
+        content: ' (Poprawna)';
+        font-size: 0.8rem;
+        opacity: 0.8;
+        float: right;
+    }
+
+    /* Zablokowane po sprawdzeniu */
+    .answer-option.disabled {
+        cursor: default;
+        opacity: 0.9;
+    }
+
+    /* Animacje */
+    .fade-in {
+        animation: fadeIn 0.4s ease-out;
+    }
+
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+
+    .timer-badge {
+        background-color: var(--danger);
+        color: white;
+        padding: 0.3rem 0.8rem;
+        border-radius: 20px;
+        font-size: 0.9rem;
+        font-weight: bold;
+    }
+    
+    #real-form { display: none; }
+</style>
+
+<div class="quiz-container">
+    <div class="progress-header">
+        <span id="quiz-progress">Pytanie 1/?</span>
+        {% if time_limit and time_limit > 0 %}
+            <span id="timer-container" class="timer-badge">
+                <i class="bi bi-clock"></i> <span id="countdown">--:--</span>
+            </span>
+        {% endif %}
     </div>
-  {% endif %}
 
-  <form id="quiz-form" method="post">
+    <div id="question-container" class="fade-in">
+        <div id="question-text">Ładowanie pytania...</div>
+        <div id="question-type-hint" class="text-muted small mb-3"></div>
+        <div id="answers-container"></div>
+    </div>
+
+    <div class="mt-4 d-flex justify-content-between">
+        <button id="prev-btn" class="btn btn-outline-secondary" disabled>Wstecz</button>
+        <button id="action-btn" class="btn btn-primary px-4">Dalej</button>
+    </div>
+</div>
+
+<form id="real-form" method="post">
     {% csrf_token %}
-    <input type="hidden" name="time_over" id="time_over" value="0" />
+    <input type="hidden" name="time_over" id="time_over" value="0">
+    <div id="hidden-inputs-container"></div>
+</form>
 
-    <ol>
-      {% for item in questions_data %}
-        <li style="margin-bottom:1rem;">
-          <p><strong>{{ item.q.text }}</strong></p>
+<script>
+    // --- KONFIGURACJA ---
+    const quizData = JSON.parse('{{ questions_json|escapejs }}');
+    const timeLimitSec = parseInt('{{ time_limit|default:"0" }}');
+    // Czy włączyć tryb natychmiastowego sprawdzania?
+    const instantFeedback = "{{ instant_feedback|yesno:'true,false' }}" === "true";
+    // --- STAN QUIZU ---
+    let currentQuestionIndex = 0;
+    let userSelections = {}; // { questionId: [answerId, ...] }
+    
+    // Status pytania w trybie instant: 'answering' lub 'checked'
+    // Służy do tego, żeby przycisk "Dalej" wiedział co robić
+    let currentQuestionState = 'answering'; 
 
-          {% for ans in item.answers %}
-            <label style="display:block; margin:.25rem 0;">
-              {% if item.q.question_type == 'SINGLE' %}
-                <input type="radio" name="q_{{ item.q.id }}" value="{{ ans.id }}"> {{ ans.text }}
-              {% else %}
-                <input type="checkbox" name="q_{{ item.q.id }}" value="{{ ans.id }}"> {{ ans.text }}
-              {% endif %}
-            </label>
-          {% endfor %}
+    // --- ELEMENTY DOM ---
+    const questionText = document.getElementById('question-text');
+    const questionTypeHint = document.getElementById('question-type-hint');
+    const answersContainer = document.getElementById('answers-container');
+    const actionBtn = document.getElementById('action-btn');
+    const prevBtn = document.getElementById('prev-btn');
+    const quizProgress = document.getElementById('quiz-progress');
+    const questionContainer = document.getElementById('question-container');
+    const hiddenInputsContainer = document.getElementById('hidden-inputs-container');
+    const realForm = document.getElementById('real-form');
 
-          {% if item.q.question_type == 'SINGLE' %}
-            <small style="opacity:.7;">(Zaznacz jedną poprawną odpowiedź)</small>
-          {% else %}
-            <small style="opacity:.7;">(Zaznacz wszystkie poprawne odpowiedzi)</small>
-          {% endif %}
-          </li>
-      {% endfor %}
-    </ol>
-
-    <button type="submit" class="btn btn-primary">Zakończ i pokaż wynik</button>
-  </form>
-
-  {% if time_limit and time_limit > 0 %}
-  <script>
-    (function(){
-      var limit = parseInt('{{ time_limit|default:"0" }}');
-      if (!limit) return;
-
-      var remaining = limit;
-      var el = document.getElementById('countdown');
-      var over = document.getElementById('time_over');
-      var form = document.getElementById('quiz-form');
-
-      function fmt(sec){
-        var m = Math.floor(sec/60), s = sec%60;
-        return m + ':' + (s<10 ? '0' : '') + s;
-      }
-      function tick(){
-        if (!el) return;
-        el.textContent = fmt(remaining);
-        if (remaining <= 0){
-          over.value = '1';
-          form.submit();
-          return;
+    // --- START ---
+    function initQuiz() {
+        if (!quizData || quizData.length === 0) {
+            questionText.textContent = "Brak pytań.";
+            actionBtn.style.display = 'none';
+            prevBtn.style.display = 'none';
+            return;
         }
-        remaining -= 1;
-        setTimeout(tick, 1000);
-      }
-      tick();
-    })();
-  </script>
-  {% endif %}
+        loadQuestion();
+        startTimer();
+    }
+
+    // --- RENDEROWANIE PYTANIA ---
+    function loadQuestion() {
+        const currentQuestion = quizData[currentQuestionIndex];
+        
+        // Reset widoku
+        currentQuestionState = 'answering'; 
+        updateActionButtonText();
+        
+        // Animacja
+        questionContainer.classList.remove('fade-in');
+        void questionContainer.offsetWidth; 
+        questionContainer.classList.add('fade-in');
+
+        // Teksty
+        questionText.textContent = currentQuestion.text;
+        questionTypeHint.textContent = currentQuestion.type === 'SINGLE' 
+            ? "(Wybierz jedną odpowiedź)" 
+            : "(Wybierz wszystkie poprawne odpowiedzi)";
+        quizProgress.textContent = `Pytanie ${currentQuestionIndex + 1} z ${quizData.length}`;
+
+        // Odpowiedzi
+        answersContainer.innerHTML = '';
+        const currentSelections = userSelections[currentQuestion.id] || [];
+
+        currentQuestion.answers.forEach(answer => {
+            const btn = document.createElement('div');
+            btn.classList.add('answer-option');
+            btn.textContent = answer.text;
+            btn.dataset.id = answer.id;
+            btn.dataset.type = currentQuestion.type;
+            // Przechowujemy info o poprawności w atrybucie (dla trybu instant)
+            if (instantFeedback) {
+                btn.dataset.isCorrect = answer.is_correct ? 'true' : 'false';
+            }
+
+            if (currentSelections.includes(answer.id)) {
+                btn.classList.add('selected');
+            }
+
+            btn.addEventListener('click', () => handleAnswerClick(currentQuestion, answer.id, btn));
+            answersContainer.appendChild(btn);
+        });
+
+        // Wstecz tylko jeśli nie jesteśmy na 1 pytaniu i nie w trybie 'checked' (żeby nie mieszać)
+        prevBtn.disabled = (currentQuestionIndex === 0);
+        
+        // Jeśli wróciliśmy do pytania, które już było sprawdzone w trybie instant -> pokaż wyniki od razu
+        // (Opcjonalne, w najprostszej wersji resetujemy stan do 'answering' i pozwalamy poprawić przed wysłaniem, 
+        // ale jeśli 'instantFeedback' jest true, zazwyczaj nie pozwala się zmieniać zdania po sprawdzeniu. 
+        // Tutaj dla uproszczenia pozwalamy poprawić, chyba że zablokujemy. 
+        // W tej implementacji 'prev' pozwala cofnąć i zmienić.)
+    }
+
+    // --- OBSŁUGA KLIKNIĘCIA ODPOWIEDZI ---
+    function handleAnswerClick(questionObj, answerId, btnElement) {
+        // Jeśli pytanie już sprawdzone, blokujemy zmiany
+        if (instantFeedback && currentQuestionState === 'checked') return;
+
+        let selections = userSelections[questionObj.id] || [];
+
+        if (questionObj.type === 'SINGLE') {
+            selections = [answerId];
+            answersContainer.querySelectorAll('.answer-option').forEach(opt => opt.classList.remove('selected'));
+            btnElement.classList.add('selected');
+        } else {
+            // MULTIPLE
+            if (selections.includes(answerId)) {
+                selections = selections.filter(id => id !== answerId);
+                btnElement.classList.remove('selected');
+            } else {
+                selections.push(answerId);
+                btnElement.classList.add('selected');
+            }
+        }
+        userSelections[questionObj.id] = selections;
+    }
+
+    // --- AKTUALIZACJA PRZYCISKU AKCJI ---
+    function updateActionButtonText() {
+        if (instantFeedback && currentQuestionState === 'answering') {
+            actionBtn.textContent = 'Sprawdź';
+            actionBtn.classList.replace('btn-success', 'btn-primary');
+        } else {
+            // Tryb normalny LUB tryb instant po sprawdzeniu
+            if (currentQuestionIndex === quizData.length - 1) {
+                actionBtn.textContent = 'Zakończ i wyślij';
+                actionBtn.classList.replace('btn-primary', 'btn-success');
+            } else {
+                actionBtn.textContent = 'Dalej';
+                actionBtn.classList.replace('btn-success', 'btn-primary');
+            }
+        }
+    }
+
+    // --- LOGIKA "SPRAWDŹ" (INSTANT FEEDBACK) ---
+    function checkAnswersInstant() {
+        const currentQuestion = quizData[currentQuestionIndex];
+        const selections = userSelections[currentQuestion.id] || [];
+        const options = answersContainer.querySelectorAll('.answer-option');
+
+        let anySelected = selections.length > 0;
+        if (!anySelected) {
+            alert("Wybierz odpowiedź przed sprawdzeniem!");
+            return;
+        }
+
+        options.forEach(opt => {
+            const isCorrect = opt.dataset.isCorrect === 'true';
+            const isSelected = opt.classList.contains('selected');
+            const type = currentQuestion.type;
+
+            opt.classList.add('disabled'); // Blokada klikania
+
+            if (isSelected) {
+                if (isCorrect) {
+                    opt.classList.add('correct'); // Zielony
+                } else {
+                    opt.classList.add('incorrect'); // Czerwony
+                }
+            } else {
+                // Niezaznaczone
+                if (isCorrect && type === 'MULTIPLE') {
+                    // W pytaniach wielokrotnego wyboru pokazujemy co pominięto
+                    opt.classList.add('missing'); // Żółty
+                }
+                // W SINGLE zazwyczaj nie pokazujemy poprawnej jeśli zaznaczono źle, 
+                // chyba że chcemy być bardzo pomocni. awwwquiz pokazywał 'missing' tylko przy correct=true.
+                if (isCorrect && type === 'SINGLE') {
+                     opt.classList.add('correct'); // Pokaż właściwą na zielono (opcjonalne)
+                     // w awwwquiz logika była: if (isCorrect) element.classList.add('missing'); 
+                     // Ale dla single choice lepiej dać green border lub missing. Zróbmy 'missing' dla spójności.
+                     if(!isSelected) opt.classList.add('missing');
+                }
+            }
+        });
+
+        // Zmiana stanu
+        currentQuestionState = 'checked';
+        updateActionButtonText();
+    }
+
+    // --- OBSŁUGA PRZYCISKU GŁÓWNEGO ---
+    actionBtn.addEventListener('click', () => {
+        // SCENARIUSZ 1: Tryb Instant, etap 'answering' -> Sprawdzamy
+        if (instantFeedback && currentQuestionState === 'answering') {
+            checkAnswersInstant();
+            return;
+        }
+
+        // SCENARIUSZ 2: Przejście do następnego (Tryb normalny LUB Instant po sprawdzeniu)
+        if (currentQuestionIndex < quizData.length - 1) {
+            currentQuestionIndex++;
+            loadQuestion();
+        } else {
+            submitQuiz();
+        }
+    });
+
+    prevBtn.addEventListener('click', () => {
+        if (currentQuestionIndex > 0) {
+            currentQuestionIndex--;
+            loadQuestion();
+        }
+    });
+
+    // --- WYSYŁKA ---
+    function submitQuiz() {
+        hiddenInputsContainer.innerHTML = '';
+        for (const [qId, ansIds] of Object.entries(userSelections)) {
+            ansIds.forEach(ansId => {
+                const input = document.createElement('input');
+                input.type = 'hidden';
+                input.name = `q_${qId}`;
+                input.value = ansId;
+                hiddenInputsContainer.appendChild(input);
+            });
+        }
+        realForm.submit();
+    }
+
+    // --- TIMER ---
+    function startTimer() {
+        if (timeLimitSec <= 0) return;
+        let remaining = timeLimitSec;
+        const display = document.getElementById('countdown');
+        const timeOverInput = document.getElementById('time_over');
+
+        function updateDisplay() {
+            const m = Math.floor(remaining / 60);
+            const s = remaining % 60;
+            display.textContent = `${m}:${s < 10 ? '0' : ''}${s}`;
+        }
+
+        const interval = setInterval(() => {
+            remaining--;
+            updateDisplay();
+            if (remaining <= 0) {
+                clearInterval(interval);
+                timeOverInput.value = '1';
+                alert("Czas minął!");
+                submitQuiz();
+            }
+        }, 1000);
+        updateDisplay();
+    }
+
+    initQuiz();
+</script>
 {% endblock %}

@@ -436,6 +436,7 @@ def quiz_take_view(request, pk):
     time_limit_seconds = quiz.time_limit * 60
 
     if request.method == 'POST':
+        # --- LOGIKA ZAPISU WYNIKU (Bez zmian - serwer liczy punkty) ---
         total = quiz.questions.count()
         correct_count = 0
         details = []
@@ -472,12 +473,10 @@ def quiz_take_view(request, pk):
                 'is_correct': is_correct,
             })
 
-        score_percent = round((correct_count / total) * 100)
+        score_percent = round((correct_count / total) * 100) if total > 0 else 0
         time_over_bool = request.POST.get('time_over') == '1'
 
-        user_to_save = None
-        if request.user.is_authenticated:
-            user_to_save = request.user
+        user_to_save = request.user if request.user.is_authenticated else None
         
         QuizAttempt.objects.create(
             quiz=quiz,
@@ -497,16 +496,31 @@ def quiz_take_view(request, pk):
             'time_over': time_over_bool
         })
     
-    questions_data = []
+    # --- PRZYGOTOWANIE DANYCH DLA JS ---
+    questions_json = []
     for q in quiz.questions.prefetch_related('answers'):
         answers = list(q.answers.all())
         random.shuffle(answers)
-        questions_data.append({'q': q, 'answers': answers})
+        
+        # Przesyłamy 'is_correct' do JS, aby mógł obsłużyć tryb natychmiastowy.
+        # W trybie klasycznym JS po prostu zignoruje to pole.
+        answers_data = [{'id': a.id, 'text': a.text, 'is_correct': a.is_correct} for a in answers]
+        
+        questions_json.append({
+            'id': q.id,
+            'text': q.text,
+            'type': q.question_type,
+            'answers': answers_data
+        })
+
+    import json
+    questions_json_str = json.dumps(questions_json)
 
     return render(request, 'quizzes/quiz_take.html', {
         'quiz': quiz,
-        'questions_data': questions_data,
+        'questions_json': questions_json_str,
         'time_limit': time_limit_seconds,
+        'instant_feedback': quiz.instant_feedback, # Przekazujemy ustawienie do szablonu
     })
 
 @login_required

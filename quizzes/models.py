@@ -44,6 +44,12 @@ class Quiz(models.Model):
         verbose_name="Limit czasu (w minutach)",
         help_text="Ustaw 0, aby wyłączyć limit czasu."
     )
+
+    instant_feedback = models.BooleanField(
+        default=False, 
+        verbose_name="Natychmiastowe odpowiedzi",
+        help_text="Jeśli zaznaczone, użytkownik zobaczy poprawne odpowiedzi po każdym pytaniu."
+    )
     
     # Relacje zdefiniowane przez modele pośrednie (Through Models)
     # Pozwala to na dodanie dodatkowych pól (jak 'role') do relacji
