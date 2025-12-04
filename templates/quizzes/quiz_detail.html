@@ -2,7 +2,16 @@
 {% block title %}{{ quiz.title }}{% endblock %}
 {% block content %}
   <h1>{{ quiz.title }}</h1>
-  <p>Liczba pytań: {{ quiz.questions.count }}</p>
+  <p>
+    Liczba pytań w quizie: 
+    <strong>
+    {% if quiz.questions_count_limit > 0 and quiz.questions_count_limit < quiz.questions.count %}
+        {{ quiz.questions_count_limit }} (wylosowane z puli {{ quiz.questions.count }})
+    {% else %}
+        {{ quiz.questions.count }}
+    {% endif %}
+    </strong>
+  </p>
 
   {% if quiz.time_limit > 0 %}
     <p><strong>Limit czasu:</strong> {{ quiz.time_limit }} minut.</p>

@@ -355,3 +355,42 @@ input:focus, select:focus, textarea:focus {
 #cookie-banner.show {
     transform: translateY(0); /* Wysunięcie */
 }
+
+.navbar .btn {
+    border: 1px solid transparent !important; /* Ukrywa obramowanie, ale zachowuje rozmiar */
+    background-color: transparent !important; /* Przezroczyste tło */
+    color: var(--text); /* Kolor tekstu zgodny z motywem */
+    font-weight: 500;
+    transition: all 0.2s ease-in-out;
+}
+
+/* Styl po najechaniu myszką (Hover) */
+.navbar .btn:hover {
+    background-color: var(--surface-hover) !important; /* Subtelne tło po najechaniu */
+    border-color: var(--border) !important; /* Opcjonalnie: delikatna ramka przy hover */
+    color: var(--primary); /* Zmiana koloru tekstu na wiodący */
+    transform: translateY(-1px); /* Lekkie uniesienie dla efektu klikalności */
+}
+
+/* Specjalny styl dla przycisku "Wyloguj" (jeśli chcesz go wyróżnić) */
+.navbar form .btn {
+    color: var(--danger) !important; /* Czerwony kolor dla wylogowania */
+}
+
+.navbar form .btn:hover {
+    background-color: rgba(239, 68, 68, 0.1) !important; /* Czerwonawe tło */
+    border-color: var(--danger) !important;
+}
+
+/* Ewentualna korekta dla aktywnego przycisku (jeśli używasz klasy .active lub btn-primary w menu) */
+/* Jeśli "Moje Quizy" ma być wyróżnione jako główna akcja: */
+.navbar .btn-outline-primary {
+    /* Nadpisujemy bootstrapowy outline, żeby pasował do nowego stylu */
+    border-color: transparent !important; 
+    color: var(--primary) !important;
+}
+
+.navbar .btn-outline-primary:hover {
+    background-color: var(--primary) !important;
+    color: var(--primary-text) !important;
+}

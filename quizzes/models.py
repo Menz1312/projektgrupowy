@@ -1,6 +1,7 @@
 # quizzes/models.py
 from django.db import models
 from django.conf import settings
+from django.core.validators import MinValueValidator, MaxValueValidator
 
 class QuizGroup(models.Model):
     name = models.CharField(max_length=100, verbose_name="Nazwa grupy")
@@ -43,6 +44,13 @@ class Quiz(models.Model):
         default=0, 
         verbose_name="Limit czasu (w minutach)",
         help_text="Ustaw 0, aby wyłączyć limit czasu."
+    )
+
+    questions_count_limit = models.IntegerField(
+        default=10,
+        verbose_name="Liczba pytań w podejściu",
+        validators=[MinValueValidator(1), MaxValueValidator(30)],
+        help_text="Ustal, ile pytań ma zostać wylosowanych do jednego podejścia (zakres: 1-30)."
     )
 
     instant_feedback = models.BooleanField(
