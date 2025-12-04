@@ -1,0 +1,42 @@
+{% extends 'base.html' %}
+{% block title %}Moje Grupy{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1>Moje Grupy Użytkowników</h1>
+    <a href="{% url 'group-create' %}" class="btn btn-success">
+        <i class="bi bi-people"></i> Stwórz Grupę
+    </a>
+</div>
+
+{% if groups %}
+    <div class="row row-cols-1 row-cols-md-2 g-4">
+        {% for group in groups %}
+        <div class="col">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h5 class="card-title">{{ group.name }}</h5>
+                    <p class="card-text text-muted">
+                        Liczba członków: <strong>{{ group.members.count }}</strong>
+                    </p>
+                    <div style="font-size: 0.9em; margin-bottom: 10px;">
+                        {% for member in group.members.all|slice:":5" %}
+                            <span class="badge bg-light text-dark border">{{ member.username }}</span>
+                        {% endfor %}
+                        {% if group.members.count > 5 %}
+                            <span class="badge bg-light text-dark border">...</span>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="card-footer bg-white border-top-0">
+                    <a href="{% url 'group-edit' group.pk %}" class="btn btn-sm btn-outline-primary">Edytuj</a>
+                    <a href="{% url 'group-delete' group.pk %}" class="btn btn-sm btn-outline-danger">Usuń</a>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+{% else %}
+    <p class="text-muted">Nie masz jeszcze żadnych grup. Stwórz pierwszą, aby łatwiej udostępniać quizy.</p>
+{% endif %}
+{% endblock %}

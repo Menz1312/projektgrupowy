@@ -2,93 +2,431 @@
 {% block title %}{% if is_new %}Nowy quiz{% else %}Edytuj quiz{% endif %}{% endblock %}
 
 {% block content %}
-  {% if not is_new and quiz %}
-    <a href="{% url 'my-quizzes' %}">&larr; Wróć do moich quizów</a>
-  {% endif %}
+<style>
+    /* Style formularza */
+    .form-card {
+        background-color: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        box-shadow: var(--shadow);
+        padding: 1.5rem;
+        margin-bottom: 2rem;
+        transition: background-color 0.3s;
+    }
 
-  <h1>
-    {% if is_new %}Utwórz nowy quiz
-    {% else %}Edytuj quiz „{{ quiz.title }}”
+    .form-section-title {
+        font-size: 1.1rem;
+        font-weight: 700;
+        color: var(--text-muted);
+        margin-bottom: 1rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        border-bottom: 1px solid var(--border);
+        padding-bottom: 0.5rem;
+    }
+
+    /* Toggle Buttons */
+    .toggle-btn-group { display: flex; gap: 10px; flex-wrap: wrap; }
+    .btn-check:checked + .toggle-label {
+        background-color: rgba(79, 70, 229, 0.1);
+        border-color: var(--primary);
+        color: var(--primary);
+    }
+    .btn-check#private-toggle:checked + .toggle-label {
+        border-color: var(--primary); 
+        background-color: rgba(79, 70, 229, 0.1);
+        color: var(--primary);
+    }
+    .toggle-label {
+        width: 100%; text-align: left; padding: 1rem; border-radius: 10px;
+        display: flex; align-items: center; justify-content: space-between;
+        font-weight: 600; transition: all 0.2s; border: 1px solid var(--border);
+        background-color: var(--bg); color: var(--text); cursor: pointer;
+    }
+    .toggle-label:hover { background-color: var(--surface-hover); }
+    .toggle-icon { font-size: 1.2rem; }
+
+    /* Ukrywanie elementów Django */
+    .hidden-django-field { display: none; }
+    
+    /* Wiersze uprawnień */
+    .perm-row {
+        background: var(--bg);
+        border: 1px solid var(--border);
+        padding: 0.5rem;
+        border-radius: 8px;
+        margin-bottom: 0.5rem;
+        transition: all 0.3s ease;
+    }
+
+    /* Klasa ukrywająca wiersz po kliknięciu usuń */
+    .perm-row.deleted {
+        display: none !important;
+    }
+
+    .input-group input[type="number"],
+    .input-group input[type="text"],
+    .input-group select {
+        width: 1% !important; /* Wymaga Bootstrap do poprawnego działania flexa */
+        flex: 1 1 auto;
+        border-top-left-radius: 0;
+        border-bottom-left-radius: 0;
+    }
+
+    .input-group-text {
+        background-color: var(--surface-hover);
+        border-color: var(--border);
+        color: var(--text-muted);
+    }
+</style>
+
+<div class="mb-4">
+    {% if not is_new and quiz %}
+        <a href="{% url 'my-quizzes' %}" class="text-decoration-none text-muted mb-2 d-inline-block">
+            <i class="bi bi-arrow-left"></i> Wróć do moich quizów
+        </a>
     {% endif %}
-  </h1>
+    <h1>
+        {% if is_new %}Utwórz nowy quiz
+        {% else %}Edytuj quiz
+        {% endif %}
+    </h1>
+</div>
 
-  <form method="post" novalidate>
+<form method="post" novalidate id="quizForm">
     {% csrf_token %}
 
     {% if quiz_form.non_field_errors %}
       <div class="alert alert-danger">{{ quiz_form.non_field_errors }}</div>
     {% endif %}
 
-    <div class="mb-3">
-      <label for="{{ quiz_form.title.id_for_label }}" class="form-label">Tytuł</label>
-      {{ quiz_form.title }}
-      {% for e in quiz_form.title.errors %}<div class="text-danger">{{ e }}</div>{% endfor %}
-    </div>
-
-    <div class="mb-3">
-      <label for="{{ quiz_form.visibility.id_for_label }}" class="form-label">Widoczność</label>
-      {% for e in quiz_form.visibility.errors %}<div class="text-danger">{{ e }}</div>{% endfor %}
-      {{ quiz_form.visibility }}
-    </div>
-
-    <div class="mb-3">
-      <label for="{{ quiz_form.time_limit.id_for_label }}" class="form-label">{{ quiz_form.time_limit.label }}</label>
-      {{ quiz_form.time_limit }}
-      <small style="display: block; opacity: 0.7;">{{ quiz_form.time_limit.help_text }}</small>
-      {% for e in quiz_form.time_limit.errors %}<div class="text-danger">{{ e }}</div>{% endfor %}
-    </div>
-    
-    <div class="mb-3">
-      <label class="form-label">{{ quiz_form.shared_with.label }}</label>
-      {% for e in quiz_form.shared_with.errors %}<div class="text-danger">{{ e }}</div>{% endfor %}
-      <div style="max-height: 200px; overflow-y: auto; border: 1px solid var(--border); padding: 10px; border-radius: 4px;">
-        {{ quiz_form.shared_with }}
-      </div>
-      <small style="display: block; opacity: 0.7;">Wybierz, którzy użytkownicy mogą zobaczyć ten quiz, jeśli jest ustawiony jako "Prywatny".</small>
-    </div>
-    <button type="submit" class="btn btn-primary">
-      {% if is_new %}Utwórz i przejdź do dodawania pytań{% else %}Zapisz zmiany w quizie{% endif %}
-    </button>
-
-    {% if not is_new and quiz %}
-      <a class="btn btn-secondary" href="{% url 'question-create' quiz_pk=quiz.pk %}">Dodaj pytanie ręcznie</a>
-      <a class="btn btn-danger" href="{% url 'quiz-delete' pk=quiz.pk %}">Usuń quiz</a>
-    {% endif %}
-  </form>
-
-  {% if not is_new and quiz %}
-    
-    <div style="border: 1px solid var(--border); padding: 1rem; margin-top: 2rem; border-radius: 8px;">
-        <h3>Import / Export Pytań (JSON)</h3>
-        <p>Możesz zaimportować pytania z pliku JSON lub wyeksportować istniejące.</p>
+    <div class="form-card">
+        <h3 class="form-section-title"><i class="bi bi-sliders"></i> Ustawienia Podstawowe</h3>
         
-        <form action="{% url 'quiz-import-json' pk=quiz.pk %}" method="post" enctype="multipart/form-data" style="margin-bottom: 1rem; padding-top: 1rem; border-top: 1px solid var(--border);">
-            {% csrf_token %}
-            <label for="json_file_input" class="form-label" style="font-weight: bold;">Importuj pytania z pliku JSON:</label>
-            <div style="display: flex; gap: 0.5rem; align-items: center;">
-                <input type="file" name="json_file" id="json_file_input" accept=".json" required class="form-control" style="width: auto;">
-                <button type="submit" class="btn btn-primary">Importuj</button>
+        <div class="mb-4">
+            <label class="form-label fw-bold">Tytuł Quizu</label>
+            {{ quiz_form.title }}
+            {% if quiz_form.title.errors %}
+                <div class="text-danger small mt-1">{{ quiz_form.title.errors }}</div>
+            {% endif %}
+        </div>
+
+        <div class="row mb-4">
+            <div class="col-md-6">
+                <label class="form-label fw-bold">Limit czasu (minuty)</label>
+                <div class="input-group">
+                    <span class="input-group-text bg-light border-end-0"><i class="bi bi-stopwatch"></i></span>
+                    {{ quiz_form.time_limit }}
+                </div>
+                <div class="form-text small">Zostaw 0 dla braku limitu.</div>
             </div>
-        </form>
-        
-        <div style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border);">
-            <a href="{% url 'quiz-export-json' pk=quiz.pk %}" class="btn btn-secondary">Eksportuj wszystkie pytania do JSON</a>
+        </div>
+
+        <div class="row g-3">
+            <div class="col-md-6">
+                <div class="position-relative">
+                    <input type="checkbox" 
+                           name="{{ quiz_form.instant_feedback.name }}" 
+                           id="{{ quiz_form.instant_feedback.id_for_label }}"
+                           class="btn-check"
+                           {% if quiz_form.instant_feedback.value %}checked{% endif %}>
+                    
+                    <label class="toggle-label" for="{{ quiz_form.instant_feedback.id_for_label }}">
+                        <span>
+                            <i class="bi bi-lightning-charge-fill me-2"></i>
+                            Natychmiastowe odpowiedzi
+                            <div class="small fw-normal text-muted mt-1" style="font-size: 0.8em;">
+                                Pokazuj wynik po każdym pytaniu
+                            </div>
+                        </span>
+                        <i class="bi bi-check-circle-fill toggle-icon"></i>
+                    </label>
+                </div>
+            </div>
+
+            <div class="col-md-6">
+                <div class="hidden-django-field">
+                    {{ quiz_form.visibility }}
+                </div>
+                <input type="checkbox" class="btn-check" id="private-toggle">
+                <label class="toggle-label" for="private-toggle">
+                    <span>
+                        <i class="bi bi-lock-fill me-2"></i>
+                        Quiz Prywatny
+                        <div class="small fw-normal text-muted mt-1" style="font-size: 0.8em;">
+                            Tylko zaproszeni użytkownicy
+                        </div>
+                    </span>
+                    <i class="bi bi-shield-lock-fill toggle-icon"></i>
+                </label>
+            </div>
         </div>
     </div>
-    <h3 style="margin-top:2rem;">Pytania w quizie</h3>
+
+    <div class="form-card">
+        <h3 class="form-section-title"><i class="bi bi-people"></i> Dostęp i Grupy</h3>
+        
+        <ul class="nav nav-tabs mb-3" id="permTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="users-tab" data-bs-toggle="tab" data-bs-target="#users-content" type="button" role="tab">Użytkownicy</button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="groups-tab" data-bs-toggle="tab" data-bs-target="#groups-content" type="button" role="tab">Grupy</button>
+            </li>
+        </ul>
+
+        <div class="tab-content" id="permTabsContent">
+            <div class="tab-pane fade show active" id="users-content" role="tabpanel">
+                {{ user_perms_formset.management_form }}
+                <div id="user-perms-container">
+                    {% for form in user_perms_formset %}
+                        <div class="perm-row d-flex align-items-center gap-2 flex-wrap {% if form.DELETE.value %}deleted{% endif %}">
+                            {{ form.id }}
+                            <div class="flex-grow-1" style="min-width: 200px;">
+                                {{ form.user }}
+                            </div>
+                            <div style="min-width: 150px;">
+                                {{ form.role }}
+                            </div>
+                            
+                            {% if user_perms_formset.can_delete %}
+                                <div class="hidden-django-field">
+                                    {{ form.DELETE }}
+                                </div>
+                                <button type="button" class="btn btn-outline-danger btn-sm delete-row-btn" title="Usuń dostęp">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            {% endif %}
+                        </div>
+                        {% if form.errors %}<div class="text-danger small mb-2">{{ form.errors }}</div>{% endif %}
+                    {% endfor %}
+                </div>
+                <button type="button" class="btn btn-sm btn-outline-primary mt-2" id="add-user-perm">
+                    <i class="bi bi-person-plus"></i> Dodaj użytkownika
+                </button>
+            </div>
+
+            <div class="tab-pane fade" id="groups-content" role="tabpanel">
+                {{ group_perms_formset.management_form }}
+                <div id="group-perms-container">
+                    {% for form in group_perms_formset %}
+                        <div class="perm-row d-flex align-items-center gap-2 flex-wrap {% if form.DELETE.value %}deleted{% endif %}">
+                            {{ form.id }}
+                            <div class="flex-grow-1" style="min-width: 200px;">
+                                {{ form.group }}
+                            </div>
+                            <div style="min-width: 150px;">
+                                {{ form.role }}
+                            </div>
+                            
+                            {% if group_perms_formset.can_delete %}
+                                <div class="hidden-django-field">
+                                    {{ form.DELETE }}
+                                </div>
+                                <button type="button" class="btn btn-outline-danger btn-sm delete-row-btn" title="Usuń grupę">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            {% endif %}
+                        </div>
+                        {% if form.errors %}<div class="text-danger small mb-2">{{ form.errors }}</div>{% endif %}
+                    {% endfor %}
+                </div>
+                <button type="button" class="btn btn-sm btn-outline-primary mt-2" id="add-group-perm">
+                    <i class="bi bi-people"></i> Dodaj grupę
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div class="d-flex gap-2 justify-content-between align-items-center mb-5">
+        {% if not is_new and quiz and quiz.author == user %}
+            <a class="btn btn-outline-danger" href="{% url 'quiz-delete' pk=quiz.pk %}" onclick="return confirm('Czy na pewno chcesz usunąć ten quiz?')">
+                <i class="bi bi-trash"></i> <span class="d-none d-sm-inline">Usuń</span>
+            </a>
+        {% else %}
+            <div></div>
+        {% endif %}
+        
+        <button type="submit" class="btn btn-primary btn-lg px-5 shadow-sm">
+            <i class="bi bi-check-lg"></i> Zapisz Quiz
+        </button>
+    </div>
+</form>
+
+{% if not is_new and quiz %}
+<div class="form-card border-top-primary">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h3 class="form-section-title mb-0" style="border:none;"><i class="bi bi-collection"></i> Pytania ({{ quiz.questions.count }})</h3>
+        <div class="dropdown">
+            <button class="btn btn-secondary btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                Opcje
+            </button>
+            <ul class="dropdown-menu">
+                <li><a class="dropdown-item" href="{% url 'quiz-export-json' pk=quiz.pk %}"><i class="bi bi-download"></i> Eksportuj JSON</a></li>
+                <li><hr class="dropdown-divider"></li>
+                <li><h6 class="dropdown-header">Import</h6></li>
+                <li>
+                    <form action="{% url 'quiz-import-json' pk=quiz.pk %}" method="post" enctype="multipart/form-data" class="px-3 py-1">
+                        {% csrf_token %}
+                        <input type="file" name="json_file" accept=".json" class="form-control form-control-sm mb-2" required>
+                        <button type="submit" class="btn btn-primary btn-sm w-100">Wgraj</button>
+                    </form>
+                </li>
+            </ul>
+        </div>
+    </div>
+
+    <a href="{% url 'question-create' quiz_pk=quiz.pk %}" class="btn btn-outline-success w-100 mb-4 dashed-border" style="border-style: dashed; border-width: 2px;">
+        <i class="bi bi-plus-circle-fill display-6 align-middle"></i><br>
+        <span class="fw-bold">Dodaj nowe pytanie</span>
+    </a>
+
     {% if quiz.questions.exists %}
-      <ol>
+      <div class="list-group list-group-flush rounded-3 border">
         {% for q in quiz.questions.all %}
-          <li>
-            {{ q.text }}
-            · <a href="{% url 'question-edit' pk=q.pk %}">Edytuj</a>
-            · <a href="{% url 'question-delete' pk=q.pk %}">Usuń</a>
-          </li>
+          <div class="list-group-item list-group-item-action d-flex justify-content-between align-items-center p-3">
+            <div style="flex: 1; min-width: 0;">
+                <div class="d-flex align-items-center gap-2">
+                    <span class="badge bg-light text-dark border">{{ forloop.counter }}</span>
+                    <h6 class="mb-0 text-truncate" style="max-width: 90%;">{{ q.text }}</h6>
+                </div>
+                <small class="text-muted ms-4">
+                    {{ q.get_question_type_display }} • {{ q.answers.count }} odp.
+                </small>
+            </div>
+            <div class="btn-group ms-2">
+                <a href="{% url 'question-edit' pk=q.pk %}" class="btn btn-sm btn-light text-primary"><i class="bi bi-pencil-fill"></i></a>
+                <a href="{% url 'question-delete' pk=q.pk %}" class="btn btn-sm btn-light text-danger"><i class="bi bi-trash-fill"></i></a>
+            </div>
+          </div>
         {% endfor %}
-      </ol>
+      </div>
     {% else %}
-      <p>Brak pytań. Dodaj je ręcznie, wygeneruj (jeśli dostępne) lub zaimportuj z pliku JSON.</p>
+      <div class="text-center py-4 text-muted">
+          <i class="bi bi-inbox fs-1 d-block mb-2"></i>
+          Brak pytań. Dodaj pierwsze pytanie powyżej.
+      </div>
     {% endif %}
+</div>
+{% endif %}
+
+<div style="display:none">
+    <div id="empty-user-form">
+        <div class="perm-row d-flex align-items-center gap-2 flex-wrap">
+            {{ user_perms_formset.empty_form.id }}
+            <div class="flex-grow-1" style="min-width: 200px;">
+                {{ user_perms_formset.empty_form.user }}
+            </div>
+            <div style="min-width: 150px;">
+                {{ user_perms_formset.empty_form.role }}
+            </div>
+            <div class="hidden-django-field">
+                {{ user_perms_formset.empty_form.DELETE }}
+            </div>
+            <button type="button" class="btn btn-outline-danger btn-sm delete-row-btn">
+                <i class="bi bi-trash"></i>
+            </button>
+        </div>
+    </div>
+    <div id="empty-group-form">
+        <div class="perm-row d-flex align-items-center gap-2 flex-wrap">
+            {{ group_perms_formset.empty_form.id }}
+            <div class="flex-grow-1" style="min-width: 200px;">
+                {{ group_perms_formset.empty_form.group }}
+            </div>
+            <div style="min-width: 150px;">
+                {{ group_perms_formset.empty_form.role }}
+            </div>
+            <div class="hidden-django-field">
+                {{ group_perms_formset.empty_form.DELETE }}
+            </div>
+            <button type="button" class="btn btn-outline-danger btn-sm delete-row-btn">
+                <i class="bi bi-trash"></i>
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+    // --- SKRYPT DLA TOGGLE BUTTON (VISIBILITY) ---
+    document.addEventListener('DOMContentLoaded', function() {
+        const privateToggle = document.getElementById('private-toggle');
+        const radioInputs = document.querySelectorAll('input[name="visibility"]');
+        
+        if (radioInputs.length) {
+            function findRadioByValue(val) {
+                return Array.from(radioInputs).find(r => r.value === val);
+            }
+
+            const privateRadio = findRadioByValue('PRIVATE');
+            if (privateRadio && privateRadio.checked) {
+                privateToggle.checked = true;
+            } else {
+                privateToggle.checked = false;
+            }
+
+            privateToggle.addEventListener('change', function() {
+                if (this.checked) {
+                    const r = findRadioByValue('PRIVATE');
+                    if (r) r.checked = true;
+                } else {
+                    const r = findRadioByValue('PUBLIC');
+                    if (r) r.checked = true;
+                }
+            });
+        }
+    });
+
+    // --- SKRYPT DLA FORMSETÓW (Dodawanie i Usuwanie) ---
     
-  {% endif %}
+    // Funkcja dodająca nowy wiersz
+    function addForm(prefix, containerId, emptyFormId) {
+        const totalForms = document.getElementById(`id_${prefix}-TOTAL_FORMS`);
+        const container = document.getElementById(containerId);
+        const emptyFormHtml = document.getElementById(emptyFormId).innerHTML;
+        
+        let count = parseInt(totalForms.value);
+        const newHtml = emptyFormHtml.replace(/__prefix__/g, count);
+        
+        const div = document.createElement('div');
+        div.innerHTML = newHtml;
+        container.appendChild(div.firstElementChild); // Dodaj sam element wiersza
+        
+        totalForms.value = count + 1;
+    }
+
+    document.getElementById('add-user-perm').addEventListener('click', () => {
+        addForm('users', 'user-perms-container', 'empty-user-form');
+    });
+    
+    document.getElementById('add-group-perm').addEventListener('click', () => {
+        addForm('groups', 'group-perms-container', 'empty-group-form');
+    });
+
+    // Delegacja zdarzeń dla przycisków usuwania (obsługuje istniejące i nowe wiersze)
+    document.addEventListener('click', function(e) {
+        // Sprawdź czy kliknięto przycisk lub ikonę wewnątrz przycisku
+        const btn = e.target.closest('.delete-row-btn');
+        if (btn) {
+            const row = btn.closest('.perm-row');
+            if (row) {
+                // Znajdź checkbox DELETE wewnątrz tego wiersza
+                // Checkboxy w formsetach mają końcówkę -DELETE
+                const deleteCheckbox = row.querySelector('input[type="checkbox"][name$="-DELETE"]');
+                
+                if (deleteCheckbox) {
+                    deleteCheckbox.checked = true; // Zaznacz do usunięcia
+                    row.classList.add('deleted');  // Ukryj wizualnie
+                    // row.style.display = 'none'; // Alternatywa dla klasy
+                } else {
+                    // Jeśli to nowy wiersz (który nie ma jeszcze ID w bazie i nie zawsze ma pole DELETE renderowane przez Django w prosty sposób),
+                    // po prostu usuwamy go z DOM.
+                    // Uwaga: standardowy empty_form z can_delete=True powinien mieć pole DELETE.
+                    // Ale na wszelki wypadek, jeśli go nie ma (bo np. extra=0 i JS generuje), usuń z DOM.
+                    row.remove();
+                }
+            }
+        }
+    });
+</script>
 {% endblock %}

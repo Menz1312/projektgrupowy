@@ -1,30 +1,70 @@
 # quizzes/forms.py
 from django import forms
-from .models import Quiz, Question, Answer
+from .models import Quiz, Question, Answer, QuizGroup, QuizUserPermission, QuizGroupPermission
 from django.forms import inlineformset_factory
 from django.contrib.auth import get_user_model
 
 User = get_user_model()
 
-class QuizForm(forms.ModelForm):
-    shared_with = forms.ModelMultipleChoiceField(
-        queryset=User.objects.none(),
+class QuizGroupForm(forms.ModelForm):
+    members = forms.ModelMultipleChoiceField(
+        queryset=User.objects.none(), 
         widget=forms.CheckboxSelectMultiple,
         required=False,
-        label="Udostępnij użytkownikom"
+        label="Wybierz członków grupy"
     )
 
     class Meta:
+        model = QuizGroup
+        fields = ['name', 'members']
+        widgets = {
+            'name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'np. Klasa 3B'}),
+        }
+
+class QuizForm(forms.ModelForm):
+    class Meta:
         model = Quiz
-        fields = ['title', 'visibility', 'time_limit', 'shared_with']
+        # Dodaj 'instant_feedback' do listy poniżej:
+        fields = ['title', 'visibility', 'time_limit', 'instant_feedback']
+        
         labels = {
             'title': 'Tytuł Quizu',
             'visibility': 'Widoczność',
+            # instant_feedback weźmie etykietę z modelu (verbose_name)
         }
         widgets = {
             'time_limit': forms.NumberInput(attrs={'min': 0, 'step': 1}),
             'visibility': forms.RadioSelect,
+            # Dla pola BooleanField Django domyślnie wygeneruje Checkbox, co jest OK
         }
+
+# --- FORMSETY DLA UPRAWNIEŃ ---
+
+# Formularz dla pojedynczego wiersza uprawnień użytkownika
+QuizUserPermissionFormSet = inlineformset_factory(
+    Quiz,
+    QuizUserPermission,
+    fields=('user', 'role'),
+    extra=1, # Ile pustych wierszy pokazać na start
+    can_delete=True,
+    widgets={
+        'user': forms.Select(attrs={'class': 'form-select'}),
+        'role': forms.Select(attrs={'class': 'form-select'}),
+    }
+)
+
+# Formularz dla pojedynczego wiersza uprawnień grupy
+QuizGroupPermissionFormSet = inlineformset_factory(
+    Quiz,
+    QuizGroupPermission,
+    fields=('group', 'role'),
+    extra=1,
+    can_delete=True,
+    widgets={
+        'group': forms.Select(attrs={'class': 'form-select'}),
+        'role': forms.Select(attrs={'class': 'form-select'}),
+    }
+)
 
 class QuestionForm(forms.ModelForm):
     class Meta:
@@ -61,7 +101,6 @@ AnswerFormSet = inlineformset_factory(
     }
 )
 
-# --- NOWY FORMULARZ DO GENEROWANIA ---
 class QuizGenerationForm(forms.Form):
     topic = forms.CharField(
         label="Temat quizu", 

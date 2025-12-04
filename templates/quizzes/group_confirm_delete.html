@@ -1,0 +1,13 @@
+{% extends 'base.html' %}
+{% block title %}Usuń grupę{% endblock %}
+{% block content %}
+    <h1>Potwierdź usunięcie</h1>
+    <p>Czy na pewno chcesz usunąć grupę: "<strong>{{ group.name }}</strong>"?</p>
+    <p class="text-muted small">Uwaga: Usunięcie grupy odbierze dostęp do quizów udostępnionych wyłącznie tej grupie. Konta użytkowników nie zostaną usunięte.</p>
+    
+    <form method="post">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-danger">Tak, usuń</button>
+        <a href="{% url 'group-list' %}" class="btn btn-secondary">Anuluj</a>
+    </form>
+{% endblock %}
