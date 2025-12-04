@@ -2,56 +2,126 @@
 <!DOCTYPE html>
 <html lang="pl">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>{% block title %}QuizApp{% endblock %}</title>
-  <link rel="stylesheet" href="{% static 'css/style.css' %}">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}QuizApp{% endblock %}</title>
+    
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+    
+    <link rel="stylesheet" href="{% static 'css/style.css' %}">
+    
+    <script>
+    /* Skrypt inline zapobiegający mignięciu motywu przy ładowaniu */
+    (function () {
+      try {
+        var stored = localStorage.getItem('theme');
+        var systemDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+        var theme = stored || (systemDark ? 'dark' : 'light');
+        document.documentElement.setAttribute('data-theme', theme);
+      } catch (e) {}
+    })();
+    </script>
 
-  <script>
-  (function () {
-    try {
-      var stored = localStorage.getItem('theme');
-      var systemDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-      var theme = stored || (systemDark ? 'dark' : 'light');
-      document.documentElement.setAttribute('data-theme', theme);
-    } catch (e) {}
-  })();
-  </script>
+    <style>
+        body { 
+            background-color: var(--bg); 
+            color: var(--text);
+            transition: background-color 0.3s, color 0.3s;
+        }
+        .card { border: none; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+        .navbar { box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        .btn-check:checked + .btn-outline-primary {
+            background-color: #e0e7ff;
+            color: #4338ca;
+            border-color: #4338ca;
+            font-weight: bold;
+        }
+    </style>
 </head>
-<body>
-  {% if messages %}
-  <div class="messages">
-    {% for message in messages %}
-      <p class="{{ message.tags }}">{{ message }}</p>
-    {% endfor %}
-  </div>
-  {% endif %}
+<body class="d-flex flex-column min-vh-100">
 
-  <nav>
-    <a href="{% url 'home' %}" class="logo">QuizApp</a>
-    <div class="links" style="display:flex;align-items:center;">
-      {% if user.is_authenticated %}
-        <span style="margin-right:1.5rem;">Witaj, {{ user.username }}!</span>
-        <a href="{% url 'my-quizzes' %}">Moje Quizy</a>
-        {# DODANY LINK DO EDYCJI PROFILU #}
-        <a href="{% url 'profile_edit' %}" style="margin-left: 1.5rem;">Edytuj Profil</a>
-        <form action="{% url 'logout' %}" method="post" style="display:inline;margin:0;">
-          {% csrf_token %}
-          <button type="submit" style="background:none;border:none;color:#007bff;font-weight:500;cursor:pointer;padding:0;font-size:1rem;margin-left:1.5rem;">Wyloguj</button>
-        </form>
-      {% else %}
-        <a href="{% url 'login' %}">Zaloguj</a>
-        <a href="{% url 'register' %}">Zarejestruj</a>
-      {% endif %}
+    <nav class="navbar navbar-expand-lg navbar-light bg-white mb-4">
+        <div class="container">
+            <a class="navbar-brand fw-bold text-primary" href="{% url 'home' %}">
+                <i class="bi bi-patch-question-fill"></i> QuizApp
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto align-items-center">
+                    {% if user.is_authenticated %}
+                        <li class="nav-item">
+                            <span class="nav-link disabled text-dark">Witaj, <strong>{{ user.username }}</strong></span>
+                        </li>
+                        <li class="nav-item ms-lg-2">
+                            <a class="btn btn-outline-primary btn-sm" href="{% url 'my-quizzes' %}">Moje Quizy</a>
+                        </li>
+                        <li class="nav-item ms-lg-2">
+                            <a class="btn btn-light btn-sm" href="{% url 'profile_edit' %}">Profil</a>
+                        </li>
+                        <li class="nav-item ms-lg-2">
+                            <form action="{% url 'logout' %}" method="post" class="d-inline">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-link nav-link text-danger">Wyloguj</button>
+                            </form>
+                        </li>
+                    {% else %}
+                        <li class="nav-item">
+                          <a class="nav-link" href="{% url 'login' %}">Zaloguj</a>
+                        </li>
+                        <li class="nav-item ms-2">
+                          <a class="btn btn-primary btn-sm" href="{% url 'register' %}">Zarejestruj</a>
+                        </li>
+                    {% endif %}
+                        <li class="nav-item ms-2">
+                          <button id="theme-toggle" class="theme-toggle" aria-label="Przełącz motyw">
+                            <i id="theme-icon" class="bi bi-moon-stars-fill"></i>
+                          </button>
+                        </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
 
-      <button id="theme-toggle" class="theme-toggle" aria-label="Przełącz motyw" style="margin-left:1rem;">🌓</button>
+    <div class="container">
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert alert-{{ message.tags|default:'info' }} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            {% endfor %}
+        {% endif %}
+        
+        {% block content %}{% endblock %}
     </div>
-  </nav>
 
-  <main class="container">
-    {% block content %}{% endblock %}
-  </main>
+    <footer class="mt-auto py-3 text-center text-muted text-small">
+        <div class="container">
+            &copy; 2023 QuizApp
+        </div>
+    </footer>
 
-  <script src="{% static 'js/theme.js' %}"></script>
+    <div id="cookie-banner" class="p-4">
+        <div class="container d-flex flex-column flex-md-row align-items-center justify-content-between gap-3">
+            <div class="text-muted">
+                <h5 class="fw-bold mb-1"><i class="bi bi-cookie"></i> Pliki Cookies i Ochrona Danych</h5>
+                <p class="mb-0 small">
+                    Nasza strona wykorzystuje pliki cookies w celu zapewnienia prawidłowego działania serwisu oraz personalizacji treści.
+                    Korzystając z witryny, akceptujesz naszą Politykę Prywatności oraz przetwarzanie danych osobowych zgodnie z RODO.
+                </p>
+            </div>
+            <div class="d-flex gap-2 shrink-0">
+                <button id="accept-cookies" class="btn btn-primary btn-sm px-4 fw-bold">Akceptuję</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="{% static 'js/theme.js' %}"></script>
+    <script src="{% static 'js/cookies.js' %}"></script>
 </body>
 </html>

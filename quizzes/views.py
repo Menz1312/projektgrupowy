@@ -32,8 +32,18 @@ HF_API_URL = "https://router.huggingface.co/v1/chat/completions"
 
 def home_view(request):
     query = request.GET.get('q', '')
-    quizzes = Quiz.objects.filter(visibility='PUBLIC', title__icontains=query)
-    return render(request, 'home.html', {'quizzes': quizzes})
+    
+    # Pobieramy publiczne quizy, filtrujemy po tytule (jesli jest zapytanie),
+    # sortujemy od najnowszych (-id) i bierzemy tylko pierwsze 10.
+    quizzes = Quiz.objects.filter(
+        visibility='PUBLIC', 
+        title__icontains=query
+    ).order_by('-id')[:10]
+    
+    return render(request, 'home.html', {
+        'quizzes': quizzes,
+        'query': query
+    })
 
 def _can_view_quiz(user, quiz):
     if quiz.visibility == 'PUBLIC':
