@@ -183,6 +183,7 @@
 <form id="real-form" method="post">
     {% csrf_token %}
     <input type="hidden" name="time_over" id="time_over" value="0">
+    <input type="hidden" name="question_ids_included" value="{{ selected_ids_str }}">
     <div id="hidden-inputs-container"></div>
 </form>
 

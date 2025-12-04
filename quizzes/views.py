@@ -446,43 +446,52 @@ def quiz_take_view(request, pk):
     time_limit_seconds = quiz.time_limit * 60
 
     if request.method == 'POST':
-        # --- LOGIKA ZAPISU WYNIKU (Bez zmian - serwer liczy punkty) ---
-        total = quiz.questions.count()
+        # --- LOGIKA ZAPISU WYNIKU (Bez zmian) ---
+        # Pobieramy ID pytań, które faktycznie brały udział w losowaniu
+        question_ids_str = request.POST.get('question_ids_included', '')
+        
+        questions_to_grade = []
+        if question_ids_str:
+            try:
+                question_ids = [int(qid) for qid in question_ids_str.split(',') if qid.strip().isdigit()]
+                questions_to_grade = quiz.questions.filter(id__in=question_ids).prefetch_related('answers')
+            except ValueError:
+                pass
+        
+        # Zabezpieczenie: jeśli lista jest pusta (błąd formularza), weź wszystkie (to powodowało błąd 50 pytań)
+        if not questions_to_grade:
+            questions_to_grade = quiz.questions.prefetch_related('answers')
+
+        total = len(questions_to_grade) # ### Teraz total to np. 15, a nie 50
         correct_count = 0
         details = []
 
-        for question in quiz.questions.prefetch_related('answers'):
+        for question in questions_to_grade:
             field = f"q_{question.id}"
             correct_ids = set(question.answers.filter(is_correct=True).values_list('id', flat=True))
             chosen_ids = set()
             
-            if question.question_type == Question.QuestionType.SINGLE:
-                chosen_id_str = request.POST.get(field)
-                if chosen_id_str:
-                    try:
-                        chosen_ids.add(int(chosen_id_str))
-                    except ValueError:
-                        pass
+            # Pobieranie chosen_ids z request.POST (Twoja logika)...
+            if question.question_type == 'SINGLE':
+                 val = request.POST.get(field)
+                 if val: chosen_ids.add(int(val))
             else:
-                chosen_id_strs = request.POST.getlist(field)
-                for id_str in chosen_id_strs:
-                    try:
-                        chosen_ids.add(int(id_str))
-                    except ValueError:
-                        pass 
-            
+                 vals = request.POST.getlist(field)
+                 chosen_ids = {int(v) for v in vals}
+
             is_correct = (chosen_ids == correct_ids) and len(chosen_ids) > 0
             if is_correct:
                 correct_count += 1
-                
+            
             details.append({
                 'question': question,
-                'answers': list(question.answers.all()),
+                'answers': list(question.answers.all()), # Tu można dodać .order_by('?') jeśli chcesz mieszać odpowiedzi na ekranie wyniku
                 'chosen_ids': chosen_ids,
                 'correct_ids': correct_ids,
                 'is_correct': is_correct,
             })
 
+        # Obliczanie wyniku
         score_percent = round((correct_count / total) * 100) if total > 0 else 0
         time_over_bool = request.POST.get('time_over') == '1'
 
@@ -506,32 +515,47 @@ def quiz_take_view(request, pk):
             'time_over': time_over_bool
         })
     
-    # --- PRZYGOTOWANIE DANYCH DLA JS ---
-    questions_json = []
-    for q in quiz.questions.prefetch_related('answers'):
-        answers = list(q.answers.all())
-        random.shuffle(answers)
+    else:
+        # Pobieramy wszystkie pytania
+        all_questions = list(quiz.questions.prefetch_related('answers'))
+        random.shuffle(all_questions) # Mieszamy pulę
+
+        # ### ZASTOSOWANIE LIMITU ###
+        limit = quiz.questions_count_limit
+        if limit > 0 and limit < len(all_questions):
+            selected_questions = all_questions[:limit]
+        else:
+            selected_questions = all_questions
+
+        # ### GENEROWANIE STRINGA ID ###
+        # To jest kluczowe dla template'u - tworzymy string np. "10,4,22"
+        selected_ids_str = ",".join(str(q.id) for q in selected_questions)
+
+        # Przygotowanie JSON dla JS
+        questions_json = []
+        for q in selected_questions:
+            answers = list(q.answers.all())
+            random.shuffle(answers)
+            answers_data = [{'id': a.id, 'text': a.text, 'is_correct': a.is_correct} for a in answers]
+            questions_json.append({
+                'id': q.id,
+                'text': q.text,
+                'type': q.question_type,
+                'answers': answers_data
+            })
+
+        import json
+        questions_json_str = json.dumps(questions_json)
         
-        # Przesyłamy 'is_correct' do JS, aby mógł obsłużyć tryb natychmiastowy.
-        # W trybie klasycznym JS po prostu zignoruje to pole.
-        answers_data = [{'id': a.id, 'text': a.text, 'is_correct': a.is_correct} for a in answers]
-        
-        questions_json.append({
-            'id': q.id,
-            'text': q.text,
-            'type': q.question_type,
-            'answers': answers_data
+        time_limit_seconds = quiz.time_limit * 60
+
+        return render(request, 'quizzes/quiz_take.html', {
+            'quiz': quiz,
+            'questions_json': questions_json_str,
+            'time_limit': time_limit_seconds,
+            'instant_feedback': quiz.instant_feedback,
+            'selected_ids_str': selected_ids_str, # ### PRZEKAZANIE DO SZABLONU ###
         })
-
-    import json
-    questions_json_str = json.dumps(questions_json)
-
-    return render(request, 'quizzes/quiz_take.html', {
-        'quiz': quiz,
-        'questions_json': questions_json_str,
-        'time_limit': time_limit_seconds,
-        'instant_feedback': quiz.instant_feedback, # Przekazujemy ustawienie do szablonu
-    })
 
 @login_required
 def quiz_export_json_view(request, pk):

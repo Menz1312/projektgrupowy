@@ -24,18 +24,16 @@ class QuizGroupForm(forms.ModelForm):
 class QuizForm(forms.ModelForm):
     class Meta:
         model = Quiz
-        # Dodaj 'instant_feedback' do listy poniżej:
-        fields = ['title', 'visibility', 'time_limit', 'instant_feedback']
+        fields = ['title', 'visibility', 'time_limit', 'questions_count_limit', 'instant_feedback']
         
         labels = {
             'title': 'Tytuł Quizu',
             'visibility': 'Widoczność',
-            # instant_feedback weźmie etykietę z modelu (verbose_name)
         }
         widgets = {
             'time_limit': forms.NumberInput(attrs={'min': 0, 'step': 1}),
+            'questions_count_limit': forms.NumberInput(attrs={'min': 1, 'max': 30, 'step': 1}),
             'visibility': forms.RadioSelect,
-            # Dla pola BooleanField Django domyślnie wygeneruje Checkbox, co jest OK
         }
 
 # --- FORMSETY DLA UPRAWNIEŃ ---
