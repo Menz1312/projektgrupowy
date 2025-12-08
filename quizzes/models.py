@@ -88,8 +88,18 @@ class Quiz(models.Model):
         # Sprawdź czy jest w tabeli uprawnień jako EDITOR
         return self.quizuserpermission_set.filter(user=user, role='EDITOR').exists()
 
-    def can_view(self, user):
-        """Sprawdza, czy użytkownik ma dostęp (podgląd lub edycja)."""
+    def can_view(self, user) -> bool:
+        """Sprawdza, czy użytkownik ma dostęp (podgląd lub edycja) do quizu.
+
+        Dostęp mają publiczne quizy, autorzy, edytorzy oraz użytkownicy
+        zaproszeni bezpośrednio lub przez grupę.
+
+        Args:
+            user (User): Obiekt użytkownika, który próbuje uzyskać dostęp.
+
+        Returns:
+            bool: True, jeśli użytkownik może oglądać quiz, False w przeciwnym razie.
+        """
         if self.visibility == 'PUBLIC': return True
         if not user.is_authenticated: return False
         if self.can_edit(user): return True
