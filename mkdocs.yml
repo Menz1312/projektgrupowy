@@ -1,0 +1,60 @@
+site_name: QuizApp Dokumentacja Techniczna
+site_url: http://127.0.0.1:8000/docs/ # Zmień na docelowy adres URL
+
+nav:
+    - Wprowadzenie: index.md
+    - Struktura projektu: structure.md
+    - Technologie i Baza Danych: technologies.md
+    - Dokumentacja API: 
+        - Modele (ORM): api/models.md
+        - Widoki (Logika): api/views.md
+        - Formularze: api/forms.md
+
+theme:
+  name: material
+  language: pl
+  palette:
+    # Włącznik trybu ciemnego/jasnego
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/weather-sunny
+        name: Przełącz na tryb ciemny
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/weather-night
+        name: Przełącz na tryb jasny
+
+plugins:
+  # Ustawienie, aby Python wiedział, gdzie szukać plików projektu
+  - search
+  - include-markdown
+  - macros
+  - mkdocstrings:
+      # Konfiguracja głównej wtyczki API
+      handlers:
+        python:
+          paths: [.] # Szukaj modułów w bieżącym katalogu (głównym katalogu Django)
+          options:
+            docstring_style: google # KLUCZOWE: Użycie stylu Google
+            show_root_heading: true
+            show_source: true # Pokazuj link do kodu źródłowego
+            show_bases: true # Pokazuj klasy dziedziczone
+            show_submodules: true # Pokazuj podmoduły
+            show_if_no_docstring: false # Ukryj elementy bez docstringów
+
+markdown_extensions:
+  # Włącz rozszerzenia dla lepszej obsługi Markdown
+  - attr_list
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
