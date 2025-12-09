@@ -2,6 +2,9 @@
 {% block title %}{% if is_new %}Nowy quiz{% else %}Edytuj quiz{% endif %}{% endblock %}
 
 {% block content %}
+<link href="https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/css/tom-select.bootstrap5.min.css" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/js/tom-select.complete.min.js"></script>
+
 <style>
     /* Style formularza */
     .form-card {
@@ -77,6 +80,29 @@
         background-color: var(--surface-hover);
         border-color: var(--border);
         color: var(--text-muted);
+    }
+
+    /* --- Style dla Tom Select --- */
+    .ts-wrapper.form-select {
+        padding: 0 !important;
+        border: none !important;
+        box-shadow: none !important; 
+    }
+    .ts-control {
+        border-radius: 8px;
+        padding: 10px 12px;
+        border: 1px solid var(--border);
+        background-color: var(--bg);
+        color: var(--text);
+    }
+    .ts-dropdown {
+        background-color: var(--surface);
+        border: 1px solid var(--border);
+        color: var(--text);
+    }
+    .ts-dropdown .active {
+        background-color: var(--surface-hover);
+        color: var(--text);
     }
 </style>
 
@@ -387,7 +413,44 @@
                 }
             });
         }
+        
+        // Inicjalizacja Tom Select dla istniejących pól przy ładowaniu
+        initAllTomSelects();
     });
+
+    // --- FUNKCJE TOM SELECT ---
+    
+    function initTomSelect(selectElement) {
+        // Sprawdzamy czy to pole usera lub grupy (pomijamy pole 'role')
+        if ((selectElement.name.includes('-user') || selectElement.name.includes('-group')) && !selectElement.name.includes('__prefix__')) {
+            // Sprawdzamy czy nie został już zainicjowany (klasa 'tomselected' jest dodawana przez bibliotekę)
+            if (selectElement.classList.contains('tomselected')) return;
+            
+            new TomSelect(selectElement, {
+                create: false,
+                sortField: {
+                    field: "text",
+                    direction: "asc"
+                },
+                placeholder: 'Wybierz z listy...',
+                plugins: ['clear_button'],
+                onInitialize: function() {
+                    // Opcjonalne: poprawka wyglądu po inicjalizacji
+                    this.wrapper.classList.add('form-select'); 
+                    this.wrapper.style.border = 'none';
+                    this.wrapper.style.padding = '0';
+                }
+            });
+        }
+    }
+
+    function initAllTomSelects() {
+        const containers = document.querySelectorAll('#user-perms-container, #group-perms-container');
+        containers.forEach(container => {
+            const selects = container.querySelectorAll('select');
+            selects.forEach(select => initTomSelect(select));
+        });
+    }
 
     // --- SKRYPT DLA FORMSETÓW (Dodawanie i Usuwanie) ---
     
@@ -402,9 +465,16 @@
         
         const div = document.createElement('div');
         div.innerHTML = newHtml;
-        container.appendChild(div.firstElementChild); // Dodaj sam element wiersza
+        const newRow = div.firstElementChild; // Pobieramy element wiersza
         
+        container.appendChild(newRow); // Dodaj sam element wiersza
+        
+        // Zwiększ licznik
         totalForms.value = count + 1;
+        
+        // Inicjalizacja Tom Select w nowym wierszu
+        const newSelects = newRow.querySelectorAll('select');
+        newSelects.forEach(select => initTomSelect(select));
     }
 
     document.getElementById('add-user-perm').addEventListener('click', () => {
@@ -423,18 +493,14 @@
             const row = btn.closest('.perm-row');
             if (row) {
                 // Znajdź checkbox DELETE wewnątrz tego wiersza
-                // Checkboxy w formsetach mają końcówkę -DELETE
                 const deleteCheckbox = row.querySelector('input[type="checkbox"][name$="-DELETE"]');
                 
                 if (deleteCheckbox) {
                     deleteCheckbox.checked = true; // Zaznacz do usunięcia
                     row.classList.add('deleted');  // Ukryj wizualnie
-                    // row.style.display = 'none'; // Alternatywa dla klasy
+                    row.style.display = 'none';    // Fizycznie ukryj
                 } else {
-                    // Jeśli to nowy wiersz (który nie ma jeszcze ID w bazie i nie zawsze ma pole DELETE renderowane przez Django w prosty sposób),
-                    // po prostu usuwamy go z DOM.
-                    // Uwaga: standardowy empty_form z can_delete=True powinien mieć pole DELETE.
-                    // Ale na wszelki wypadek, jeśli go nie ma (bo np. extra=0 i JS generuje), usuń z DOM.
+                    // Jeśli to nowy wiersz (bez ID w bazie), usuwamy go z DOM
                     row.remove();
                 }
             }
