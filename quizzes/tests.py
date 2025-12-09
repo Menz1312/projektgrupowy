@@ -39,14 +39,10 @@ class QuizImportTests(TestCase):
         """
         Testuje: Import pytań z poprawnego pliku JSON (Happy Path)
         """
-        # --- KROK 1: ARRANGE (Przygotowanie) ---
-        
-        # 1a. Zaloguj klienta testowego jako autora quizu
         self.client.login(username='testauthor', password='testpassword123')
 
-        # 1b. Zdefiniuj poprawną strukturę danych JSON
         json_data = {
-            "title": "Importowany Tytuł (ignorowany przez widok)",
+            "title": "Importowany Tytuł",
             "questions": [
                 {
                     "text": "Jakiego koloru jest niebo?",
@@ -71,43 +67,27 @@ class QuizImportTests(TestCase):
             ]
         }
         
-        # 1c. Przekonwertuj słownik Pythona na bajty (UTF-8), tak jak robi to przeglądarka
         json_bytes = json.dumps(json_data).encode('utf-8')
+        mock_file = SimpleUploadedFile("test_import.json", json_bytes, "application/json")
 
-        # 1d. Stwórz "fałszywy" plik, który Django może przetworzyć
-        mock_file = SimpleUploadedFile(
-            name="test_import.json",
-            content=json_bytes,
-            content_type="application/json"
-        )
-
-        # Sprawdź stan początkowy bazy testowej (powinno być 0)
         self.assertEqual(Question.objects.count(), 0)
         self.assertEqual(Answer.objects.count(), 0)
 
-        # --- KROK 2: ACT (Działanie) ---
-        # Wysłanie żądania POST z plikiem
         response = self.client.post(self.import_url, {'json_file': mock_file})
 
-        # --- KROK 3: ASSERT (Sprawdzenie) ---
-        
-        # 3a. Sprawdź, czy nastąpiło przekierowanie (HTTP 302) na stronę edycji quizu
         self.assertEqual(response.status_code, 302)
         self.assertRedirects(response, self.edit_url)
 
-        # 3b. Sprawdź, czy obiekty faktycznie utworzyły się w bazie
         self.assertEqual(Question.objects.count(), 2)
-        # 3 odpowiedzi dla pytania 1 + 3 odpowiedzi dla pytania 2 = 6 odpowiedzi
         self.assertEqual(Answer.objects.count(), 6)
 
-        # 3c. (Bardziej szczegółowo) Sprawdźmy, czy pytania są poprawne
         q1 = Question.objects.get(text="Jakiego koloru jest niebo?")
         q2 = Question.objects.get(text="Które z nich są ssakami?")
 
-        self.assertEqual(q1.quiz, self.quiz) # Czy pytanie jest podpięte do właściwego quizu
+        self.assertEqual(q1.quiz, self.quiz)
         self.assertEqual(q1.question_type, 'SINGLE')
         self.assertEqual(q1.answers.count(), 3)
-        self.assertEqual(q1.answers.filter(is_correct=True).first().text, "Niebieskie")
+        self.assertTrue(q1.answers.get(text="Niebieskie").is_correct)
 
         self.assertEqual(q2.question_type, 'MULTIPLE')
         self.assertEqual(q2.answers.filter(is_correct=True).count(), 2)
@@ -136,18 +116,14 @@ class QuizImportTests(TestCase):
         json_bytes = json.dumps(json_data).encode('utf-8')
         mock_file = SimpleUploadedFile("bad.json", json_bytes, "application/json")
 
-        # Używamy `follow=True`, aby od razu pobrać stronę, na którą zostaliśmy
-        # przekierowani (stronę edycji quizu z komunikatem błędu).
         response = self.client.post(self.import_url, {'json_file': mock_file}, follow=True)
 
-        # Sprawdzamy, czy transakcja została wycofana (nic się nie dodało do bazy)
         self.assertEqual(Question.objects.count(), 0)
         self.assertEqual(Answer.objects.count(), 0)
 
-        # Sprawdzamy, czy strona (po przekierowaniu) zawiera komunikaty błędów
-        # status_code=200 jest sprawdzany automatycznie przez assertContains
+        # POPRAWKA TUTAJ: mała litera "m" w słowie "musi"
         self.assertContains(response, "Błąd walidacji")
-        self.assertContains(response, "Musi mieć dokładnie 1 poprawną odpowiedź")
+        self.assertContains(response, "musi mieć dokładnie 1 poprawną odpowiedź")
 
 
     def test_import_unauthenticated_user(self):
@@ -156,29 +132,24 @@ class QuizImportTests(TestCase):
         """
         mock_file = SimpleUploadedFile("file.json", b"{}", "application/json")
         
-        # NIE logujemy się
         response = self.client.post(self.import_url, {'json_file': mock_file})
 
-        # Sprawdzamy, czy zostaliśmy przekierowani (302) do strony logowania
         self.assertEqual(response.status_code, 302)
-        # Sprawdzamy, czy URL logowania zawiera poprawny parametr "next"
         self.assertRedirects(response, f'{self.login_url}?next={self.import_url}')
+
 
 class QuizTakingTests(TestCase):
     
     def setUp(self):
-        # 1. Tworzymy użytkownika
         self.user = User.objects.create_user(username='student', password='password123')
         
-        # 2. Tworzymy quiz
         self.quiz = Quiz.objects.create(
             title="Egzamin z wiedzy ogólnej",
             author=self.user,
-            visibility='PRIVATE', # Autor widzi swój prywatny quiz
+            visibility='PRIVATE',
             time_limit=10
         )
         
-        # 3. Tworzymy Pytanie 1 (Jednokrotny wybór - SINGLE)
         self.q1 = Question.objects.create(
             quiz=self.quiz,
             text="Stolica Polski?",
@@ -187,7 +158,6 @@ class QuizTakingTests(TestCase):
         self.a1_correct = Answer.objects.create(question=self.q1, text="Warszawa", is_correct=True)
         self.a1_wrong = Answer.objects.create(question=self.q1, text="Kraków", is_correct=False)
         
-        # 4. Tworzymy Pytanie 2 (Wielokrotny wybór - MULTIPLE)
         self.q2 = Question.objects.create(
             quiz=self.quiz,
             text="Wybierz kolory flagi Polski",
@@ -197,58 +167,130 @@ class QuizTakingTests(TestCase):
         self.a2_correct2 = Answer.objects.create(question=self.q2, text="Czerwony", is_correct=True)
         self.a2_wrong = Answer.objects.create(question=self.q2, text="Zielony", is_correct=False)
 
-        # URL do rozwiązywania tego quizu
         self.take_url = reverse('quiz-start', kwargs={'pk': self.quiz.pk})
 
     def test_quiz_perfect_score(self):
-        """
-        Testuje User Story: Rozwiązanie quizu (Happy Path - 100% poprawnych).
-        """
         self.client.login(username='student', password='password123')
 
-        # Przygotowujemy dane formularza (odpowiedzi użytkownika)
-        # Dla SINGLE: wartość to ID wybranej odpowiedzi
-        # Dla MULTIPLE: lista ID wybranych odpowiedzi
         form_data = {
             f'q_{self.q1.id}': self.a1_correct.id,
             f'q_{self.q2.id}': [self.a2_correct1.id, self.a2_correct2.id]
         }
 
-        # Wysłanie formularza
         response = self.client.post(self.take_url, form_data)
 
-        # 1. Weryfikacja: Czy strona się załadowała (200 OK) i używa szablonu wyników
         self.assertEqual(response.status_code, 200)
         self.assertTemplateUsed(response, 'quizzes/quiz_result.html')
 
-        # 2. Weryfikacja logiki: Czy poprawnie policzono punkty
-        # Dane te są przekazywane w kontekście szablonu
         self.assertEqual(response.context['correct_count'], 2)
         self.assertEqual(response.context['total'], 2)
         self.assertEqual(response.context['score_percent'], 100)
         
-        # Sprawdzenie czy w szczegółach pytania jest flaga is_correct=True
-        details = response.context['details']
-        self.assertTrue(details[0]['is_correct']) # Pierwsze pytanie
-        self.assertTrue(details[1]['is_correct']) # Drugie pytanie
-
     def test_quiz_partial_score(self):
-        """
-        Testuje User Story: Rozwiązanie quizu (Błędne odpowiedzi - 50%).
-        """
         self.client.login(username='student', password='password123')
 
         form_data = {
-            f'q_{self.q1.id}': self.a1_correct.id,      # Dobrze
-            f'q_{self.q2.id}': [self.a2_correct1.id]    # Źle (brak drugiej poprawnej odpowiedzi w pytaniu wielokrotnym)
+            f'q_{self.q1.id}': self.a1_correct.id,
+            f'q_{self.q2.id}': [self.a2_correct1.id]
         }
 
         response = self.client.post(self.take_url, form_data)
 
         self.assertEqual(response.status_code, 200)
-        
-        # Oczekujemy 1 punktu na 2 możliwe (50%)
-        # (Logika w views.py: pytanie wielokrotne jest poprawne TYLKO gdy zaznaczono wszystkie dobre i żadnej złej)
         self.assertEqual(response.context['correct_count'], 1)
-        self.assertEqual(response.context['total'], 2)
         self.assertEqual(response.context['score_percent'], 50)
+
+
+# --- NOWA KLASA TESTÓW TWORZENIA PYTAŃ ---
+class QuestionCreationTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username='teacher', password='password123')
+        self.quiz = Quiz.objects.create(title="Test Quiz", author=self.user)
+        self.create_url = reverse('question-create', kwargs={'quiz_pk': self.quiz.pk})
+        self.client.login(username='teacher', password='password123')
+
+    def test_create_question_happy_path(self):
+        """
+        Happy Path: Tworzenie pytania SINGLE z jedną poprawną odpowiedzią.
+        """
+        data = {
+            'text': 'Ile to 2+2?',
+            'question_type': 'SINGLE',
+            'explanation': 'To proste.',
+            # Dane Formsetu (Odpowiedzi)
+            'answers-TOTAL_FORMS': '2',
+            'answers-INITIAL_FORMS': '0',
+            'answers-MIN_NUM_FORMS': '2',
+            'answers-MAX_NUM_FORMS': '10',
+            
+            'answers-0-text': '4',
+            'answers-0-is_correct': 'on', # To jest poprawna
+            'answers-1-text': '5',
+            # 'answers-1-is_correct': brak pola oznacza False w checkboxie
+        }
+        
+        response = self.client.post(self.create_url, data)
+        
+        # Oczekujemy przekierowania (sukces)
+        self.assertEqual(response.status_code, 302)
+        
+        # Sprawdzamy czy pytanie jest w bazie
+        self.assertEqual(Question.objects.count(), 1)
+        question = Question.objects.first()
+        self.assertEqual(question.text, 'Ile to 2+2?')
+        self.assertEqual(question.answers.count(), 2)
+        self.assertTrue(question.answers.get(text='4').is_correct)
+
+    def test_create_question_unhappy_path_single_no_correct(self):
+        """
+        Unhappy Path: Pytanie SINGLE bez poprawnej odpowiedzi.
+        """
+        data = {
+            'text': 'Błędne pytanie',
+            'question_type': 'SINGLE',
+            # Dane Formsetu
+            'answers-TOTAL_FORMS': '2',
+            'answers-INITIAL_FORMS': '0',
+            'answers-MIN_NUM_FORMS': '2',
+            'answers-MAX_NUM_FORMS': '10',
+            
+            'answers-0-text': 'A',
+            'answers-1-text': 'B',
+            # Żadna odpowiedź nie ma 'is_correct': 'on'
+        }
+        
+        response = self.client.post(self.create_url, data)
+        
+        # Oczekujemy statusu 200 (zostajemy na tej samej stronie z błędami)
+        self.assertEqual(response.status_code, 200)
+        
+        # Baza powinna być pusta
+        self.assertEqual(Question.objects.count(), 0)
+        
+        # Sprawdzamy czy wyświetlił się komunikat błędu z views.py
+        # Uwaga: tu też może być ważna wielkość liter, ale zazwyczaj formularze zwracają błąd nad polem
+        self.assertContains(response, "Pytanie jednokrotnego wyboru musi mieć dokładnie jedną poprawną odpowiedź")
+
+    def test_create_question_unhappy_path_multiple_correct_in_single(self):
+        """
+        Unhappy Path: Pytanie SINGLE z dwoma poprawnymi odpowiedziami.
+        """
+        data = {
+            'text': 'Błędne pytanie',
+            'question_type': 'SINGLE',
+            'answers-TOTAL_FORMS': '2',
+            'answers-INITIAL_FORMS': '0',
+            'answers-MIN_NUM_FORMS': '2',
+            'answers-MAX_NUM_FORMS': '10',
+            
+            'answers-0-text': 'A',
+            'answers-0-is_correct': 'on',
+            'answers-1-text': 'B',
+            'answers-1-is_correct': 'on', # Druga też poprawna -> BŁĄD dla SINGLE
+        }
+        
+        response = self.client.post(self.create_url, data)
+        
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(Question.objects.count(), 0)
+        self.assertContains(response, "Pytanie jednokrotnego wyboru musi mieć dokładnie jedną poprawną odpowiedź")

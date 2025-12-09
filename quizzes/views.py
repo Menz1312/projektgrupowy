@@ -634,18 +634,37 @@ def quiz_import_json_view(request, pk):
 
             validated_answers = []
             
+            # Zliczymy poprawne odpowiedzi dla tego pytania
+            correct_count = 0 
+            
             for j, ans_data in enumerate(answers_data):
                 ans_num = j + 1
                 if not isinstance(ans_data, dict):
                      raise ValidationError(f"Pytanie {q_num}, Odpowiedź {ans_num}: Błędny format.")
                 
                 ans_text = ans_data.get('text')
-                is_correct = ans_data.get('is_correct')
+                is_correct = ans_data.get('is_correct', False) # Domyślnie False
                 
                 if not ans_text:
                     continue
                 
+                if is_correct:
+                    correct_count += 1
+
                 validated_answers.append({'text': ans_text, 'is_correct': is_correct})
+
+            # --- DODANA WALIDACJA LOGICZNA ---
+            if question_type == 'SINGLE':
+                if correct_count != 1:
+                    raise ValidationError(
+                        f"Pytanie {q_num} ('{text[:30]}...'): Typ 'Jednokrotny wybór' musi mieć dokładnie 1 poprawną odpowiedź (znaleziono {correct_count})."
+                    )
+            elif question_type == 'MULTIPLE':
+                if correct_count < 1:
+                    raise ValidationError(
+                        f"Pytanie {q_num} ('{text[:30]}...'): Typ 'Wielokrotny wybór' musi mieć przynajmniej 1 poprawną odpowiedź."
+                    )
+            # ---------------------------------
             
             questions_to_create.append({
                 'q_obj': Question(quiz=quiz, text=text, explanation=explanation, question_type=question_type),
