@@ -121,7 +121,7 @@ class QuizImportTests(TestCase):
         self.assertEqual(Question.objects.count(), 0)
         self.assertEqual(Answer.objects.count(), 0)
 
-        # POPRAWKA TUTAJ: mała litera "m" w słowie "musi"
+        # Sprawdzamy treść błędu
         self.assertContains(response, "Błąd walidacji")
         self.assertContains(response, "musi mieć dokładnie 1 poprawną odpowiedź")
 
@@ -201,7 +201,6 @@ class QuizTakingTests(TestCase):
         self.assertEqual(response.context['score_percent'], 50)
 
 
-# --- NOWA KLASA TESTÓW TWORZENIA PYTAŃ ---
 class QuestionCreationTests(TestCase):
     def setUp(self):
         self.user = User.objects.create_user(username='teacher', password='password123')
@@ -267,8 +266,7 @@ class QuestionCreationTests(TestCase):
         # Baza powinna być pusta
         self.assertEqual(Question.objects.count(), 0)
         
-        # Sprawdzamy czy wyświetlił się komunikat błędu z views.py
-        # Uwaga: tu też może być ważna wielkość liter, ale zazwyczaj formularze zwracają błąd nad polem
+        # Sprawdzamy czy wyświetlił się komunikat błędu
         self.assertContains(response, "Pytanie jednokrotnego wyboru musi mieć dokładnie jedną poprawną odpowiedź")
 
     def test_create_question_unhappy_path_multiple_correct_in_single(self):
@@ -294,3 +292,135 @@ class QuestionCreationTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(Question.objects.count(), 0)
         self.assertContains(response, "Pytanie jednokrotnego wyboru musi mieć dokładnie jedną poprawną odpowiedź")
+
+
+# --- NOWE TESTY KONTA UŻYTKOWNIKA (REJESTRACJA, LOGOWANIE, PROFIL) ---
+# --- POPRAWIONE TESTY KONTA UŻYTKOWNIKA ---
+class AccountsTests(TestCase):
+
+    def setUp(self):
+        # Tworzymy użytkownika testowego do wykorzystania w testach logowania i profilu
+        self.user = User.objects.create_user(
+            username='testuser_acc',
+            email='test@example.com',
+            password='testpassword123'
+        )
+        self.register_url = reverse('register')
+        self.login_url = reverse('login')
+        self.profile_url = reverse('profile_edit')
+
+    # --- 1. REJESTRACJA ---
+
+    def test_registration_success(self):
+        """
+        Testuje: Rejestracja z poprawnymi danymi tworzy użytkownika i przekierowuje do logowania.
+        """
+        data = {
+            'username': 'newuser_reg',
+            'email': 'new@example.com',
+            # POPRAWKA: Django UserCreationForm wymaga pól 'password1' i 'password2'
+            'password1': 'StrongPassword123!',
+            'password2': 'StrongPassword123!',
+        }
+        
+        response = self.client.post(self.register_url, data)
+        
+        # Jeśli tu nadal jest błąd 200, wypisz błędy formularza, aby je zobaczyć:
+        if response.status_code == 200:
+            print("Błędy formularza:", response.context['form'].errors)
+
+        # Sprawdzamy czy przekierowano na stronę logowania
+        self.assertRedirects(response, self.login_url)
+        
+        # Sprawdzamy czy użytkownik został utworzony w bazie
+        self.assertTrue(User.objects.filter(username='newuser_reg').exists())
+
+    def test_registration_duplicate_username(self):
+        """
+        Testuje: Próba rejestracji na zajętą nazwę użytkownika zwraca błąd walidacji.
+        """
+        data = {
+            'username': 'testuser_acc', # Ten użytkownik został utworzony w setUp
+            'email': 'another@example.com',
+            'password1': 'StrongPassword123!',
+            'password2': 'StrongPassword123!',
+        }
+        
+        response = self.client.post(self.register_url, data)
+        
+        # Formularz wyświetlony ponownie z błędami (status 200)
+        self.assertEqual(response.status_code, 200)
+        
+        # Sprawdzamy czy formularz zawiera błędy
+        form = response.context['form']
+        self.assertTrue(form.errors)
+
+    # --- 2. LOGOWANIE ---
+
+    def test_login_success(self):
+        """
+        Testuje: Poprawne logowanie przekierowuje na stronę główną i tworzy sesję.
+        """
+        response = self.client.post(self.login_url, {
+            'username': 'testuser_acc',
+            'password': 'testpassword123'
+        })
+        
+        self.assertRedirects(response, '/', target_status_code=200)
+        self.assertIn('_auth_user_id', self.client.session)
+
+    def test_login_failure(self):
+        """
+        Testuje: Logowanie złym hasłem nie tworzy sesji i wyświetla błąd.
+        """
+        response = self.client.post(self.login_url, {
+            'username': 'testuser_acc',
+            'password': 'wrongpassword'
+        })
+        
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn('_auth_user_id', self.client.session)
+        # AuthenticationForm zwykle przekazuje błędy w kontekście pod kluczem 'form'
+        self.assertTrue(response.context['form'].errors)
+
+    # --- 3. EDYCJA PROFILU ---
+
+    def test_profile_view_access_authenticated(self):
+        """
+        Testuje: Zalogowany użytkownik ma dostęp do edycji profilu.
+        """
+        self.client.login(username='testuser_acc', password='testpassword123')
+        response = self.client.get(self.profile_url)
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, 'registration/profile_edit.html')
+
+    def test_profile_view_access_anonymous(self):
+        """
+        Testuje: Niezalogowany użytkownik jest przekierowywany do logowania.
+        """
+        response = self.client.get(self.profile_url)
+        # Sprawdzamy przekierowanie na login z parametrem ?next=
+        self.assertRedirects(response, f'{self.login_url}?next={self.profile_url}')
+
+    def test_profile_update_success(self):
+        """
+        Testuje: Wysłanie formularza edycji profilu aktualizuje dane w bazie.
+        """
+        self.client.login(username='testuser_acc', password='testpassword123')
+        
+        new_data = {
+            'first_name': 'Jan',
+            'last_name': 'Kowalski',
+            'email': 'nowy@email.com'
+        }
+        
+        response = self.client.post(self.profile_url, new_data)
+        
+        # Oczekujemy przekierowania na tę samą stronę (sukces) - w widoku profile_edit_view jest return redirect('profile_edit')
+        self.assertRedirects(response, self.profile_url)
+        
+        # Odświeżamy obiekt z bazy i sprawdzamy zmiany
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.first_name, 'Jan')
+        self.assertEqual(self.user.last_name, 'Kowalski')
+        self.assertEqual(self.user.email, 'nowy@email.com')
