@@ -4,6 +4,9 @@ from django.conf import settings
 from django.core.validators import MinValueValidator, MaxValueValidator
 
 class QuizGroup(models.Model):
+    '''
+    Docstring for QuizGroup
+    '''
     name = models.CharField(max_length=100, verbose_name="Nazwa grupy")
     owner = models.ForeignKey(
         settings.AUTH_USER_MODEL, 
@@ -21,6 +24,9 @@ class QuizGroup(models.Model):
         return self.name
 
     class Meta:
+        '''
+        Docstring for Meta
+        '''
         verbose_name = "Grupa użytkowników"
         verbose_name_plural = "Grupy użytkowników"
         ordering = ['name']
