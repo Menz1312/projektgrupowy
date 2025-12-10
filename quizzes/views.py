@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
-from django.http import HttpResponse
+from django.http import HttpResponse, HttpRequest
 from django.utils.text import slugify
 from django.db import transaction
 from django.core.exceptions import ValidationError, PermissionDenied
@@ -28,7 +28,19 @@ load_dotenv()
 HF_TOKEN = os.getenv("HF_TOKEN")
 HF_API_URL = "https://router.huggingface.co/v1/chat/completions"
 
-def home_view(request):
+def home_view(request: HttpRequest) -> HttpResponse:
+    """
+    Widok strony głównej aplikacji.
+
+    Wyświetla listę publicznych quizów. Obsługuje również wyszukiwanie quizów po tytule.
+    Wyniki są ograniczone do 10 najnowszych quizów.
+
+    Args:
+        request (HttpRequest): Obiekt żądania HTTP. Parametr GET 'q' służy do wyszukiwania.
+
+    Returns:
+        HttpResponse: Wyrenderowany szablon 'home.html' z listą quizów.
+    """
     query = request.GET.get('q', '')
     
     # Pobieramy publiczne quizy, filtrujemy po tytule (jesli jest zapytanie),
@@ -43,22 +55,61 @@ def home_view(request):
         'query': query
     })
 
-def _can_view_quiz(user, quiz):
-    """Metoda pomocnicza - wrapper na metodę z modelu"""
+def _can_view_quiz(user, quiz) -> bool:
+    """
+    Pomocnicza funkcja sprawdzająca uprawnienia do podglądu quizu.
+
+    Args:
+        user (User): Użytkownik próbujący uzyskać dostęp.
+        quiz (Quiz): Quiz, do którego użytkownik chce uzyskać dostęp.
+
+    Returns:
+        bool: True, jeśli użytkownik ma dostęp, False w przeciwnym razie.
+    """
     return quiz.can_view(user)
 
 def _check_edit_permission(user, quiz):
-    """Rzuca wyjątek, jeśli użytkownik nie może edytować quizu"""
+    """
+    Sprawdza uprawnienia do edycji quizu i rzuca wyjątek w przypadku ich braku.
+
+    Args:
+        user (User): Użytkownik próbujący edytować quiz.
+        quiz (Quiz): Edytowany quiz.
+
+    Raises:
+        PermissionDenied: Jeśli użytkownik nie ma uprawnień edytora ani autora.
+    """
     if not quiz.can_edit(user):
         raise PermissionDenied("Nie masz uprawnień do edycji tego quizu.")
 
 @login_required
-def group_list_view(request):
+def group_list_view(request: HttpRequest) -> HttpResponse:
+    """
+    Wyświetla listę grup użytkowników stworzonych przez zalogowanego użytkownika.
+
+    Args:
+        request (HttpRequest): Obiekt żądania HTTP.
+
+    Returns:
+        HttpResponse: Wyrenderowany szablon 'quizzes/group_list.html'.
+    """
     groups = QuizGroup.objects.filter(owner=request.user)
     return render(request, 'quizzes/group_list.html', {'groups': groups})
 
 @login_required
-def group_create_view(request):
+def group_create_view(request: HttpRequest) -> HttpResponse:
+    """
+    Tworzy nową grupę użytkowników.
+
+    Obsługuje formularz tworzenia grupy. Właściciel grupy jest ustawiany automatycznie
+    na zalogowanego użytkownika.
+
+    Args:
+        request (HttpRequest): Obiekt żądania HTTP.
+
+    Returns:
+        HttpResponse: Wyrenderowany formularz lub przekierowanie do listy grup po sukcesie.
+    """
     if request.method == 'POST':
         form = QuizGroupForm(request.POST)
         form.fields['members'].queryset = User.objects.exclude(pk=request.user.pk)
@@ -77,7 +128,19 @@ def group_create_view(request):
     return render(request, 'quizzes/group_form.html', {'form': form, 'title': 'Nowa grupa'})
 
 @login_required
-def group_edit_view(request, pk):
+def group_edit_view(request: HttpRequest, pk: int) -> HttpResponse:
+    """
+    Edytuje istniejącą grupę użytkowników.
+
+    Tylko właściciel grupy może ją edytować.
+
+    Args:
+        request (HttpRequest): Obiekt żądania HTTP.
+        pk (int): Klucz główny edytowanej grupy.
+
+    Returns:
+        HttpResponse: Wyrenderowany formularz edycji lub przekierowanie po zapisie.
+    """
     group = get_object_or_404(QuizGroup, pk=pk, owner=request.user)
     
     if request.method == 'POST':
@@ -95,7 +158,19 @@ def group_edit_view(request, pk):
     return render(request, 'quizzes/group_form.html', {'form': form, 'title': f'Edycja grupy: {group.name}'})
 
 @login_required
-def group_delete_view(request, pk):
+def group_delete_view(request: HttpRequest, pk: int) -> HttpResponse:
+    """
+    Usuwa grupę użytkowników.
+
+    Wymaga potwierdzenia metodą POST. Tylko właściciel grupy może ją usunąć.
+
+    Args:
+        request (HttpRequest): Obiekt żądania HTTP.
+        pk (int): Klucz główny usuwanej grupy.
+
+    Returns:
+        HttpResponse: Strona potwierdzenia usunięcia lub przekierowanie po usunięciu.
+    """
     group = get_object_or_404(QuizGroup, pk=pk, owner=request.user)
     if request.method == 'POST':
         group.delete()
@@ -103,7 +178,19 @@ def group_delete_view(request, pk):
         return redirect('group-list')
     return render(request, 'quizzes/group_confirm_delete.html', {'group': group})
 
-def quiz_detail_view(request, pk):
+def quiz_detail_view(request: HttpRequest, pk: int) -> HttpResponse:
+    """
+    Wyświetla szczegóły quizu (strona startowa przed rozpoczęciem).
+
+    Sprawdza uprawnienia użytkownika do podglądu quizu (autor, edytor, viewer, publiczny).
+
+    Args:
+        request (HttpRequest): Obiekt żądania HTTP.
+        pk (int): Klucz główny quizu.
+
+    Returns:
+        HttpResponse: Szablon ze szczegółami quizu lub przekierowanie w przypadku braku uprawnień.
+    """
     quiz = get_object_or_404(Quiz, pk=pk)
     if quiz.can_view(request.user):
         return render(request, 'quizzes/quiz_detail.html', {'quiz': quiz})
@@ -112,7 +199,21 @@ def quiz_detail_view(request, pk):
     return redirect('home')
 
 @login_required
-def my_quizzes_view(request):
+def my_quizzes_view(request: HttpRequest) -> HttpResponse:
+    """
+    Wyświetla pulpit nawigacyjny z quizami użytkownika.
+
+    Quizy są podzielone na trzy kategorie:
+    1. Utworzone przez użytkownika (Autor).
+    2. Udostępnione do edycji (Edytor).
+    3. Udostępnione do rozwiązania (Przeglądający/Viewer).
+
+    Args:
+        request (HttpRequest): Obiekt żądania HTTP.
+
+    Returns:
+        HttpResponse: Wyrenderowany szablon 'quizzes/my_quizzes.html'.
+    """
     # 1. Quizy autorskie
     created_quizzes = Quiz.objects.filter(author=request.user)
     
@@ -140,7 +241,18 @@ def my_quizzes_view(request):
     })
 
 @login_required
-def quiz_create_view(request):
+def quiz_create_view(request: HttpRequest) -> HttpResponse:
+    """
+    Tworzy nowy quiz wraz z uprawnieniami dla użytkowników i grup.
+
+    Wykorzystuje transakcję atomową do spójnego zapisu quizu oraz formsetów uprawnień.
+
+    Args:
+        request (HttpRequest): Obiekt żądania HTTP.
+
+    Returns:
+        HttpResponse: Formularz tworzenia quizu lub przekierowanie do edycji po utworzeniu.
+    """
     if request.method == 'POST':
         form = QuizForm(request.POST)
         user_perms_formset = QuizUserPermissionFormSet(request.POST, prefix='users')
@@ -174,7 +286,19 @@ def quiz_create_view(request):
     })
 
 @login_required
-def quiz_edit_view(request, pk):
+def quiz_edit_view(request: HttpRequest, pk: int) -> HttpResponse:
+    """
+    Edytuje istniejący quiz oraz jego ustawienia uprawnień.
+
+    Sprawdza uprawnienia edytora przed wykonaniem akcji.
+
+    Args:
+        request (HttpRequest): Obiekt żądania HTTP.
+        pk (int): Klucz główny edytowanego quizu.
+
+    Returns:
+        HttpResponse: Formularz edycji quizu.
+    """
     quiz = get_object_or_404(Quiz, pk=pk)
     _check_edit_permission(request.user, quiz)
     
@@ -204,7 +328,19 @@ def quiz_edit_view(request, pk):
     })
 
 @login_required
-def quiz_generate_view(request):
+def quiz_generate_view(request: HttpRequest) -> HttpResponse:
+    """
+    Generuje quiz automatycznie przy użyciu sztucznej inteligencji (HuggingFace API).
+
+    Wysyła zapytanie do modelu LLM (np. Llama 3) z prośbą o wygenerowanie pytań
+    w formacie JSON, parsuje odpowiedź i tworzy strukturę quizu w bazie danych.
+
+    Args:
+        request (HttpRequest): Obiekt żądania HTTP.
+
+    Returns:
+        HttpResponse: Formularz generatora lub przekierowanie do edycji wygenerowanego quizu.
+    """
     if request.method == 'POST':
         form = QuizGenerationForm(request.POST)
         if form.is_valid():
@@ -337,7 +473,20 @@ def quiz_generate_view(request):
     return render(request, 'quizzes/quiz_generate.html', {'form': form})
 
 @login_required
-def question_create_view(request, quiz_pk):
+def question_create_view(request: HttpRequest, quiz_pk: int) -> HttpResponse:
+    """
+    Dodaje nowe pytanie do quizu.
+
+    Wyświetla formularz pytania oraz formset dla odpowiedzi.
+    Waliduje poprawność logiczną (np. czy jest poprawna odpowiedź dla SINGLE choice).
+
+    Args:
+        request (HttpRequest): Obiekt żądania HTTP.
+        quiz_pk (int): Klucz główny quizu, do którego dodawane jest pytanie.
+
+    Returns:
+        HttpResponse: Formularz dodawania pytania lub przekierowanie po zapisie.
+    """
     quiz = get_object_or_404(Quiz, pk=quiz_pk)
     _check_edit_permission(request.user, quiz)
     
@@ -376,7 +525,17 @@ def question_create_view(request, quiz_pk):
     return render(request, 'quizzes/question_form.html', context)
 
 @login_required
-def question_edit_view(request, pk):
+def question_edit_view(request: HttpRequest, pk: int) -> HttpResponse:
+    """
+    Edytuje istniejące pytanie i jego odpowiedzi.
+
+    Args:
+        request (HttpRequest): Obiekt żądania HTTP.
+        pk (int): Klucz główny edytowanego pytania.
+
+    Returns:
+        HttpResponse: Formularz edycji pytania.
+    """
     question = get_object_or_404(Question, pk=pk)
     _check_edit_permission(request.user, question.quiz)
     
@@ -412,7 +571,17 @@ def question_edit_view(request, pk):
     return render(request, 'quizzes/question_form.html', context)
 
 @login_required
-def question_delete_view(request, pk):
+def question_delete_view(request: HttpRequest, pk: int) -> HttpResponse:
+    """
+    Usuwa pytanie z quizu.
+
+    Args:
+        request (HttpRequest): Obiekt żądania HTTP.
+        pk (int): Klucz główny usuwanego pytania.
+
+    Returns:
+        HttpResponse: Potwierdzenie usunięcia lub przekierowanie.
+    """
     question = get_object_or_404(Question, pk=pk)
     _check_edit_permission(request.user, question.quiz)
     if request.method == 'POST':
@@ -423,7 +592,19 @@ def question_delete_view(request, pk):
     return render(request, 'quizzes/question_confirm_delete.html', {'question': question})
 
 @login_required
-def quiz_delete_view(request, pk):
+def quiz_delete_view(request: HttpRequest, pk: int) -> HttpResponse:
+    """
+    Usuwa cały quiz.
+
+    Operacja dozwolona tylko dla autora quizu.
+
+    Args:
+        request (HttpRequest): Obiekt żądania HTTP.
+        pk (int): Klucz główny usuwanego quizu.
+
+    Returns:
+        HttpResponse: Potwierdzenie usunięcia lub przekierowanie do listy quizów.
+    """
     # Usuwać quiz może tylko autor
     quiz = get_object_or_404(Quiz, pk=pk, author=request.user)
     if request.method == 'POST':
@@ -432,7 +613,25 @@ def quiz_delete_view(request, pk):
         return redirect('my-quizzes')
     return render(request, 'quizzes/quiz_confirm_delete.html', {'quiz': quiz})
 
-def quiz_take_view(request, pk):
+def quiz_take_view(request: HttpRequest, pk: int) -> HttpResponse:
+    """
+    Obsługuje proces rozwiązywania quizu przez użytkownika.
+
+    Metoda GET:
+        Przygotowuje quiz, losuje pytania zgodnie z limitem `questions_count_limit`,
+        miesza kolejność odpowiedzi i renderuje interfejs rozwiązywania.
+
+    Metoda POST:
+        Odbiera odpowiedzi użytkownika, oblicza wynik, zapisuje próbę (`QuizAttempt`)
+        i wyświetla podsumowanie.
+
+    Args:
+        request (HttpRequest): Obiekt żądania HTTP.
+        pk (int): Klucz główny rozwiązywanego quizu.
+
+    Returns:
+        HttpResponse: Widok rozwiązywania quizu lub widok wyników.
+    """
     quiz = get_object_or_404(Quiz, pk=pk)
 
     if not _can_view_quiz(request.user, quiz):
@@ -558,7 +757,20 @@ def quiz_take_view(request, pk):
         })
 
 @login_required
-def quiz_export_json_view(request, pk):
+def quiz_export_json_view(request: HttpRequest, pk: int) -> HttpResponse:
+    """
+    Eksportuje quiz do pliku JSON.
+
+    Pobiera strukturę quizu (pytania, odpowiedzi) i zwraca jako plik
+    do pobrania (Content-Disposition attachment).
+
+    Args:
+        request (HttpRequest): Obiekt żądania HTTP.
+        pk (int): Klucz główny eksportowanego quizu.
+
+    Returns:
+        HttpResponse: Odpowiedź zawierająca plik JSON.
+    """
     quiz = get_object_or_404(Quiz, pk=pk)
     _check_edit_permission(request.user, quiz)
 
@@ -586,7 +798,20 @@ def quiz_export_json_view(request, pk):
 @login_required
 @require_POST
 @transaction.atomic
-def quiz_import_json_view(request, pk):
+def quiz_import_json_view(request: HttpRequest, pk: int) -> HttpResponse:
+    """
+    Importuje pytania do quizu z pliku JSON.
+
+    Parsuje przesłany plik, waliduje strukturę danych i tworzy obiekty pytań/odpowiedzi w bazie.
+    Obsługuje transakcyjność - w razie błędu żadne zmiany nie są zapisywane.
+
+    Args:
+        request (HttpRequest): Obiekt żądania HTTP (musi zawierać plik 'json_file').
+        pk (int): Klucz główny quizu, do którego importujemy pytania.
+
+    Returns:
+        HttpResponse: Przekierowanie do edycji quizu z komunikatem sukcesu lub błędu.
+    """
     quiz = get_object_or_404(Quiz, pk=pk)
     _check_edit_permission(request.user, quiz)
     
