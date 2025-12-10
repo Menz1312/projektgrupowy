@@ -201,6 +201,9 @@
     // Służy do tego, żeby przycisk "Dalej" wiedział co robić
     let currentQuestionState = 'answering'; 
 
+    // Zbiór do przechowywania indeksów pytań, które zostały już sprawdzone
+    let checkedIndices = new Set();
+
     // --- ELEMENTY DOM ---
     const questionText = document.getElementById('question-text');
     const questionTypeHint = document.getElementById('question-type-hint');
@@ -270,11 +273,9 @@
         // Wstecz tylko jeśli nie jesteśmy na 1 pytaniu i nie w trybie 'checked' (żeby nie mieszać)
         prevBtn.disabled = (currentQuestionIndex === 0);
         
-        // Jeśli wróciliśmy do pytania, które już było sprawdzone w trybie instant -> pokaż wyniki od razu
-        // (Opcjonalne, w najprostszej wersji resetujemy stan do 'answering' i pozwalamy poprawić przed wysłaniem, 
-        // ale jeśli 'instantFeedback' jest true, zazwyczaj nie pozwala się zmieniać zdania po sprawdzeniu. 
-        // Tutaj dla uproszczenia pozwalamy poprawić, chyba że zablokujemy. 
-        // W tej implementacji 'prev' pozwala cofnąć i zmienić.)
+        if (instantFeedback && checkedIndices.has(currentQuestionIndex)) {
+            checkAnswersInstant();
+        }
     }
 
     // --- OBSŁUGA KLIKNIĘCIA ODPOWIEDZI ---
@@ -329,7 +330,7 @@
             alert("Wybierz odpowiedź przed sprawdzeniem!");
             return;
         }
-
+        
         options.forEach(opt => {
             const isCorrect = opt.dataset.isCorrect === 'true';
             const isSelected = opt.classList.contains('selected');
@@ -362,6 +363,7 @@
 
         // Zmiana stanu
         currentQuestionState = 'checked';
+        checkedIndices.add(currentQuestionIndex);
         updateActionButtonText();
     }
 
