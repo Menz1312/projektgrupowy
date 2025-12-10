@@ -7,6 +7,14 @@ from django.contrib.auth import get_user_model
 User = get_user_model()
 
 class QuizGroupForm(forms.ModelForm):
+    """
+    Formularz do tworzenia i edycji grup użytkowników.
+
+    Pozwala wybrać nazwę grupy oraz jej członków spośród zarejestrowanych użytkowników.
+
+    Attributes:
+        members (ModelMultipleChoiceField): Pole wyboru wielokrotnego (checkboxy) z listą użytkowników.
+    """
     members = forms.ModelMultipleChoiceField(
         queryset=User.objects.none(), 
         widget=forms.CheckboxSelectMultiple,
@@ -22,6 +30,19 @@ class QuizGroupForm(forms.ModelForm):
         }
 
 class QuizForm(forms.ModelForm):
+    """
+    Główny formularz konfiguracji Quizu.
+
+    Obsługuje podstawowe ustawienia quizu takie jak tytuł, widoczność, limity czasu
+    oraz tryb natychmiastowego sprawdzania.
+
+    Pola formularza:
+        - title: Tytuł quizu.
+        - visibility: Radio button (Publiczny/Prywatny).
+        - time_limit: Czas w minutach.
+        - questions_count_limit: Limit pytań w jednym podejściu.
+        - instant_feedback: Checkbox trybu natychmiastowego.
+    """
     class Meta:
         model = Quiz
         fields = ['title', 'visibility', 'time_limit', 'questions_count_limit', 'instant_feedback']
@@ -38,12 +59,11 @@ class QuizForm(forms.ModelForm):
 
 # --- FORMSETY DLA UPRAWNIEŃ ---
 
-# Formularz dla pojedynczego wiersza uprawnień użytkownika
-QuizUserPermissionFormSet = inlineformset_factory(
+_QuizUserPermissionFormSet = inlineformset_factory(
     Quiz,
     QuizUserPermission,
     fields=('user', 'role'),
-    extra=1, # Ile pustych wierszy pokazać na start
+    extra=1,
     can_delete=True,
     widgets={
         'user': forms.Select(attrs={'class': 'form-select'}),
@@ -51,8 +71,24 @@ QuizUserPermissionFormSet = inlineformset_factory(
     }
 )
 
-# Formularz dla pojedynczego wiersza uprawnień grupy
-QuizGroupPermissionFormSet = inlineformset_factory(
+class QuizUserPermissionFormSet(_QuizUserPermissionFormSet):
+    """
+    Formset zarządzający przypisaniem uprawnień poszczególnych użytkowników do quizu.
+
+    Jest to klasa rozszerzająca standardowy `inlineformset_factory`, która zarządza relacją
+    między modelem `Quiz` a modelem pośrednim `QuizUserPermission`.
+
+    **Kluczowe funkcje:**
+
+    * Umożliwia dodawanie, edycję i usuwanie wielu uprawnień w jednym żądaniu POST.
+    * Zawiera pola:
+        * `user`: Wybór użytkownika z listy.
+        * `role`: Przypisanie roli (np. 'VIEWER' lub 'EDITOR').
+    * Obsługuje flagę `DELETE` do usuwania istniejących uprawnień.
+    """
+    pass
+
+_QuizGroupPermissionFormSet = inlineformset_factory(
     Quiz,
     QuizGroupPermission,
     fields=('group', 'role'),
@@ -64,7 +100,22 @@ QuizGroupPermissionFormSet = inlineformset_factory(
     }
 )
 
+class QuizGroupPermissionFormSet(_QuizGroupPermissionFormSet):
+    """
+    Formset zarządzający przypisaniem uprawnień całych grup użytkowników do quizu.
+
+    Działa analogicznie do `QuizUserPermissionFormSet`, ale operuje na modelu `QuizGroup`.
+    Pozwala jednym kliknięciem nadać uprawnienia wszystkim członkom danej grupy.
+    """
+    pass
+
 class QuestionForm(forms.ModelForm):
+    """
+    Formularz edycji treści pytania.
+
+    Obsługuje treść pytania, opcjonalne wyjaśnienie oraz typ pytania
+    (jednokrotny/wielokrotny wybór).
+    """
     class Meta:
         model = Question
         fields = ['text', 'explanation', 'question_type']
@@ -98,8 +149,22 @@ AnswerFormSet = inlineformset_factory(
         'text': forms.TextInput(attrs={'placeholder': 'Wpisz odpowiedź...'}),
     }
 )
+AnswerFormSet.__doc__ = """
+Formset do zarządzania odpowiedziami wewnątrz formularza pytania.
+Wymusza minimum 2 odpowiedzi, pozwala na maksymalnie 10.
+"""
 
 class QuizGenerationForm(forms.Form):
+    """
+    Prosty formularz niepowiązany z modelem (Unbound Form) do obsługi generatora AI.
+
+    Służy do pobrania tematu i liczby pytań od użytkownika, które następnie
+    są przekazywane do API HuggingFace.
+
+    Attributes:
+        topic (CharField): Temat quizu wprowadzany przez użytkownika.
+        count (IntegerField): Oczekiwana liczba pytań (1-10).
+    """
     topic = forms.CharField(
         label="Temat quizu", 
         max_length=100, 

@@ -5,10 +5,18 @@ nav:
     - Wprowadzenie: index.md
     - Struktura projektu: structure.md
     - Technologie i Baza Danych: technologies.md
-    - Dokumentacja API: 
-        - Modele (ORM): api/models.md
-        - Widoki (Logika): api/views.md
-        - Formularze: api/forms.md
+    - Dokumentacja Aplikacji:
+        - Użytkownicy (Accounts):
+            - Modele: accounts/models.md
+            - Widoki: accounts/views.md
+        - Quizy (Quizzes):
+            - Modele: quizzes/models.md
+            - Widoki: quizzes/views.md
+            - Formularze: quizzes/forms.md
+    - Dokumentacja Frontend:
+        - JavaScript: frontend/js.md
+        - Style CSS: frontend/css.md
+        - Szablony HTML: frontend/templates.md
 
 theme:
   name: material
