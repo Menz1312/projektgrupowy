@@ -1,11 +1,30 @@
 # accounts/admin.py
+"""
+Moduł konfiguracji panelu administracyjnego dla aplikacji accounts.
+
+Rejestruje niestandardowy model użytkownika oraz dostosowuje jego widok
+w panelu admina Django.
+"""
+
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
 from .models import User
 from .forms import CustomUserCreationForm
 
-# Rozszerzamy domyślny UserAdmin, aby korzystał z naszego modelu User
 class CustomUserAdmin(UserAdmin):
+    """
+    Niestandardowa konfiguracja panelu admina dla modelu User.
+
+    Rozszerza domyślny `UserAdmin`, aby korzystał z niestandardowego formularza
+    tworzenia użytkownika oraz definiuje, jakie pola są wyświetlane na liście.
+
+    Attributes:
+        add_form (Form): Formularz używany do tworzenia nowych użytkowników (`CustomUserCreationForm`).
+        model (Model): Model, którym zarządza ta klasa (`User`).
+        list_display (list): Pola wyświetlane w kolumnach na liście użytkowników.
+        list_filter (list): Pola, po których można filtrować listę (prawy pasek boczny).
+        search_fields (list): Pola przeszukiwane przez pasek wyszukiwania.
+    """
     # Używamy niestandardowego formularza do tworzenia użytkownika (zgodnie z accounts/forms.py)
     add_form = CustomUserCreationForm 
     
