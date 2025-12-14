@@ -1,14 +1,14 @@
 /* === ZMIENNE I KOLORYSTYKA === */
 :root {
-  /* Jasny motyw (Light Mode) - czysty i czytelny */
-  --bg: #f8fafc;           /* Bardzo jasny szary */
-  --surface: #ffffff;      /* Biały */
+  /* Jasny motyw */
+  --bg: #f8fafc;
+  --surface: #ffffff;
   --surface-hover: #f1f5f9;
-  --text: #1e293b;         /* Ciemny grafit */
-  --text-muted: #64748b;   /* Szary tekst */
-  --border: #e2e8f0;       /* Delikatna ramka */
+  --text: #1e293b;
+  --text-muted: #64748b;
+  --border: #e2e8f0;
   
-  --primary: #4f46e5;      /* Indigo - nowoczesny niebieski */
+  --primary: #4f46e5;
   --primary-hover: #4338ca;
   --primary-text: #ffffff;
   
@@ -21,21 +21,21 @@
   --success: #10b981;
   
   --shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
-  --radius: 12px;          /* Zaokrąglone rogi */
+  --radius: 12px;
 }
 
 :root[data-theme="dark"] {
-  /* Ciemny motyw (Dark Mode) - głęboki i kontrastowy */
-  --bg: #0f172a;           /* Bardzo ciemny granat */
-  --surface: #1e293b;      /* Ciemniejszy panel */
+  /* Ciemny motyw */
+  --bg: #0f172a;
+  --surface: #1e293b;
   --surface-hover: #334155;
-  --text: #f1f5f9;         /* Jasny tekst */
+  --text: #f1f5f9;
   --text-muted: #94a3b8;
   --border: #334155;
   
-  --primary: #6366f1;      /* Jaśniejszy Indigo dla kontrastu */
+  --primary: #6366f1;
   --primary-hover: #818cf8;
-  --primary-text: #0f172a; /* Ciemny tekst na jasnym przycisku */
+  --primary-text: #0f172a;
   
   --secondary: #94a3b8;
   --secondary-hover: #cbd5e1;
@@ -49,9 +49,7 @@
 }
 
 /* === BAZA === */
-* {
-    box-sizing: border-box;
-}
+* { box-sizing: border-box; }
 
 body { 
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
@@ -67,23 +65,23 @@ a {
     text-decoration: none; 
     transition: color 0.2s;
 }
+a:hover { text-decoration: underline; }
 
-a:hover {
-    text-decoration: underline;
+h1, h2, h3, h4, h5, h6 { color: var(--text); margin-top: 0; }
+h1 { font-size: 2rem; margin-bottom: 1.5rem; }
+
+/* === GLOBALNE NAPRAWY BOOTSTRAPA W DARK MODE === */
+/* To jest kluczowa sekcja naprawiająca "biały tekst na białym tle" */
+
+:root[data-theme="dark"] .bg-white,
+:root[data-theme="dark"] .bg-light {
+    background-color: var(--surface) !important;
+    color: var(--text) !important;
 }
 
-h1, h2, h3, h4, h5, h6 {
-    color: var(--text);
-    margin-top: 0;
-}
-
-h1 {
-    font-size: 2rem;
-    margin-bottom: 1.5rem;
-}
-
-/* === KOMPONENTY BOOTSTRAP W TRYBIE CIEMNYM (FIX) === */
-:root[data-theme="dark"] .card {
+/* Naprawa kart i list */
+:root[data-theme="dark"] .card,
+:root[data-theme="dark"] .list-group-item {
     background-color: var(--surface);
     color: var(--text);
     border-color: var(--border);
@@ -91,44 +89,66 @@ h1 {
 
 :root[data-theme="dark"] .card-header,
 :root[data-theme="dark"] .card-footer {
-    background-color: var(--surface-hover);
+    background-color: var(--surface-hover) !important;
     border-color: var(--border);
-}
-
-:root[data-theme="dark"] .list-group-item {
-    background-color: var(--bg);
     color: var(--text);
-    border-color: var(--border);
 }
 
+/* Naprawa menu rozwijanych (np. przycisk "Opcje") */
+:root[data-theme="dark"] .dropdown-menu {
+    background-color: var(--surface);
+    border-color: var(--border);
+}
+:root[data-theme="dark"] .dropdown-item {
+    color: var(--text);
+}
+:root[data-theme="dark"] .dropdown-item:hover {
+    background-color: var(--surface-hover);
+    color: var(--primary);
+}
+
+/* Naprawa inputów w grupach (np. ikona lupki w wyszukiwarce) */
+:root[data-theme="dark"] .input-group-text {
+    background-color: var(--surface-hover) !important;
+    border-color: var(--border);
+    color: var(--text);
+}
+
+/* Naprawa koloru tekstu .text-dark (żeby był jasny w ciemnym motywie) */
+:root[data-theme="dark"] .text-dark {
+    color: var(--text) !important;
+}
+:root[data-theme="dark"] .text-muted {
+    color: var(--text-muted) !important;
+}
+
+/* WYJĄTEK: Badge informacyjne (np. Cyan) muszą mieć czarny tekst dla kontrastu */
+:root[data-theme="dark"] .badge.bg-info {
+    color: #000 !important;
+}
+
+/* Przycisk zamykania alertów (X) - inwersja kolorów */
+:root[data-theme="dark"] .btn-close {
+    filter: invert(1) grayscale(100%) brightness(200%);
+}
+
+/* Nawigacja */
 :root[data-theme="dark"] .navbar {
     background-color: var(--surface) !important;
     border-bottom: 1px solid var(--border);
 }
-
 :root[data-theme="dark"] .navbar-brand,
 :root[data-theme="dark"] .nav-link {
     color: var(--text) !important;
 }
-
 :root[data-theme="dark"] .navbar-toggler {
     border-color: var(--border);
     filter: invert(1);
 }
 
-:root[data-theme="dark"] .badge.bg-light.text-dark {
-    background-color: var(--surface-hover) !important; /* Ciemne tło zamiast jasnego */
-    color: var(--text) !important;                     /* Jasny tekst */
-    border-color: var(--border) !important;            /* Ciemna ramka */
-}
+/* === KOMPONENTY WŁASNE === */
 
-/* Opcjonalnie: Poprawka dla kart "Udostępnione dla mnie" które też używają bg-light */
-:root[data-theme="dark"] .card.bg-light {
-    background-color: rgba(255, 255, 255, 0.03) !important;
-    color: var(--text) !important;
-}
-
-/* === NAWIGACJA (style własne) === */
+/* Nawigacja */
 nav { 
     background: var(--surface); 
     padding: 1rem 2rem; 
@@ -139,258 +159,167 @@ nav {
     box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1);
 }
 
-nav a.logo { 
-    font-size: 1.5rem; 
-    font-weight: 800; 
-    color: var(--primary); 
-    text-decoration: none;
-    letter-spacing: -0.5px;
-}
-
-nav .links {
-    display: flex; 
-    align-items: center; 
-    gap: 1.5rem;
-}
-
-/* === KONTENER GŁÓWNY === */
-.container {
-    /* Bootstrap już ma klasę container, ale tutaj dodajemy własne style jeśli nie używasz bootstrapa w pełni */
-    /* Jeśli używasz Bootstrapa w base.html, te style mogą być nadpisane przez framework, co jest OK */
-    max-width: 1100px; /* Nieco szerszy dla Gridu */
-}
-
-/* === LISTA QUIZÓW (KARTY - style własne, jeśli nie używasz Bootstrap Grid) === */
-.quiz-list {
-    display: grid;
-    gap: 1rem;
-    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-}
-
-.quiz-item { 
-    padding: 1.25rem; 
-    border: 1px solid var(--border); 
-    border-radius: var(--radius); 
-    background-color: var(--surface);
-    display: flex; 
-    flex-direction: column;
-    justify-content: space-between;
-    transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
-}
-
-/* === PRZYCISKI (Kompatybilność z klasami Bootstrap .btn) === */
+/* Przyciski */
 .btn { 
-    display: inline-flex; 
-    align-items: center;
-    justify-content: center;
-    padding: 0.6rem 1.2rem; 
-    border-radius: 8px; 
-    text-decoration: none; 
-    border: 1px solid transparent; 
-    cursor: pointer; 
-    font-size: 0.95rem;
-    font-weight: 600;
-    transition: all 0.2s;
-    line-height: 1.5;
+    display: inline-flex; align-items: center; justify-content: center;
+    padding: 0.6rem 1.2rem; border-radius: 8px; text-decoration: none; 
+    border: 1px solid transparent; cursor: pointer; font-size: 0.95rem;
+    font-weight: 600; transition: all 0.2s; line-height: 1.5;
 }
+.btn:hover { text-decoration: none; filter: brightness(110%); }
 
-.btn:hover {
-    text-decoration: none;
-    filter: brightness(110%);
-}
+.btn-primary { background-color: var(--primary); border-color: var(--primary); color: var(--primary-text); }
+.btn-primary:hover { background-color: var(--primary-hover); border-color: var(--primary-hover); }
 
-.btn-primary { 
-    background-color: var(--primary); 
-    border-color: var(--primary);
-    color: var(--primary-text); 
-}
-.btn-primary:hover { 
-    background-color: var(--primary-hover); 
-    border-color: var(--primary-hover);
-}
+.btn-secondary, .btn-light { background-color: var(--surface); color: var(--text); border-color: var(--border); }
+.btn-secondary:hover, .btn-light:hover { background-color: var(--surface-hover); border-color: var(--text-muted); color: var(--text); }
 
-.btn-secondary, .btn-light { 
-    background-color: var(--surface); 
-    color: var(--text); 
-    border-color: var(--border);
-}
-.btn-secondary:hover, .btn-light:hover { 
-    background-color: var(--surface-hover); 
-    border-color: var(--text-muted);
-    color: var(--text);
-}
+.btn-danger { background-color: var(--danger); border-color: var(--danger); color: #fff; }
+.btn-danger:hover { background-color: var(--danger-hover); border-color: var(--danger-hover); }
 
-.btn-danger { 
-    background-color: var(--danger); 
-    border-color: var(--danger);
-    color: #fff; 
-}
-.btn-danger:hover { 
-    background-color: var(--danger-hover); 
-    border-color: var(--danger-hover);
-}
+.btn-outline-primary { color: var(--primary); border-color: var(--primary); background-color: transparent; }
+.btn-outline-primary:hover { background-color: var(--primary); color: #fff; }
 
-.btn-outline-primary {
-    color: var(--primary);
-    border-color: var(--primary);
-    background-color: transparent;
+/* Formularze */
+input[type="text"], input[type="search"], input[type="email"], 
+input[type="password"], input[type="number"], select, textarea { 
+    width: 100%; padding: 0.75rem; border: 1px solid var(--border); 
+    border-radius: 8px; background-color: var(--bg); color: var(--text); 
+    font-size: 1rem; transition: border-color 0.2s;
 }
-.btn-outline-primary:hover {
-    background-color: var(--primary);
-    color: #fff;
-}
-
-/* === FORMULARZE === */
-form p { margin-bottom: 1.2rem; }
-
-label { 
-    display: block; 
-    margin-bottom: 0.5rem; 
-    font-weight: 500; 
-    color: var(--text);
-    font-size: 0.9rem;
-}
-
-input[type="text"], 
-input[type="search"], 
-input[type="email"], 
-input[type="password"], 
-input[type="number"],
-select, 
-textarea { 
-    width: 100%; 
-    padding: 0.75rem; 
-    border: 1px solid var(--border); 
-    border-radius: 8px; 
-    box-sizing: border-box; 
-    background-color: var(--bg);
-    color: var(--text);
-    font-size: 1rem;
-    transition: border-color 0.2s;
-}
-
 input:focus, select:focus, textarea:focus {
-    outline: none;
-    border-color: var(--primary);
-    box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.2); /* Kolor primary z przezroczystością */
+    outline: none; border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.2);
 }
 
-/* === WIADOMOŚCI === */
-.messages {
-    padding: 0;
-    margin: 0 0 1rem 0;
-    list-style: none;
-}
-.messages p, .alert { 
-    padding: 1rem; 
-    margin-bottom: 1rem; 
-    border-radius: 8px;
-    font-weight: 500;
-}
-.messages .success, .alert-success { 
-    background-color: rgba(16, 185, 129, 0.1); 
-    color: var(--success); 
-    border: 1px solid var(--success);
-}
-.messages .error, .alert-danger { 
-    background-color: rgba(239, 68, 68, 0.1); 
-    color: var(--danger);
-    border: 1px solid var(--danger);
-}
-
-/* === DARK MODE TOGGLE (Ikona w menu) === */
+/* Dark Mode Toggle */
 .theme-toggle {
-  /* Style dla przycisku, jeśli nie używasz klas Bootstrapa */
-  padding: 0.5rem; 
-  border-radius: 50%;
-  border: 1px solid var(--border); 
-  background-color: var(--surface); 
-  color: var(--text);
-  cursor: pointer;
-  width: 40px;
-  height: 40px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 1.2rem;
-  transition: transform 0.2s, background-color 0.2s;
+  padding: 0.5rem; border-radius: 50%; border: 1px solid var(--border); 
+  background-color: var(--surface); color: var(--text); cursor: pointer;
+  width: 40px; height: 40px; display: flex; align-items: center; justify-content: center;
+  font-size: 1.2rem; transition: transform 0.2s, background-color 0.2s;
 }
-.theme-toggle:hover {
-    transform: rotate(15deg);
-    background-color: var(--surface-hover);
-}
+.theme-toggle:hover { transform: rotate(15deg); background-color: var(--surface-hover); }
 
-/* === STYLIZACJA ODPOWIEDZI W QUIZIE (nadpisanie Bootstrapa) === */
+/* Quiz Styles */
 .btn-check:checked + .btn-outline-primary {
-    background-color: rgba(79, 70, 229, 0.1) !important; /* Tło po zaznaczeniu */
+    background-color: rgba(79, 70, 229, 0.1) !important;
     color: var(--primary) !important;
     border-color: var(--primary) !important;
     font-weight: bold;
     box-shadow: 0 0 0 2px var(--primary) inset;
 }
 
-/* Drobne poprawki dla tekstu w ciemnym motywie */
-:root[data-theme="dark"] .text-muted {
-    color: #94a3b8 !important;
-}
-:root[data-theme="dark"] .text-dark {
-    color: #f1f5f9 !important;
-}
-
-/* === COOKIE BANNER === */
+/* Cookie Banner */
 #cookie-banner {
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    width: 100%;
-    z-index: 1050; /* Powyżej innych elementów */
-    background-color: var(--surface);
-    color: var(--text);
+    position: fixed; bottom: 0; left: 0; width: 100%; z-index: 1050;
+    background-color: var(--surface); color: var(--text);
     border-top: 1px solid var(--border);
     box-shadow: 0 -4px 6px -1px rgba(0, 0, 0, 0.1);
-    transform: translateY(100%); /* Domyślnie ukryty (przesunięty w dół) */
-    transition: transform 0.3s ease-in-out;
+    transform: translateY(100%); transition: transform 0.3s ease-in-out;
+}
+#cookie-banner.show { transform: translateY(0); }
+
+/* Navbar Buttons Fix */
+.navbar .btn { background-color: transparent !important; color: var(--text); }
+.navbar .btn:hover { background-color: var(--surface-hover) !important; color: var(--primary); }
+
+/* === POPRAWKA: ZAKŁADKI (TABS) W DARK MODE === */
+/* Naprawia problem "biały tekst na białym tle" w sekcji Dostęp i Grupy */
+
+:root[data-theme="dark"] .nav-tabs {
+    border-bottom-color: var(--border);
 }
 
-#cookie-banner.show {
-    transform: translateY(0); /* Wysunięcie */
+:root[data-theme="dark"] .nav-tabs .nav-link {
+    color: var(--text-muted); /* Nieaktywne zakładki - szare */
+    border: 1px solid transparent;
 }
 
-.navbar .btn {
-    border: 1px solid transparent !important; /* Ukrywa obramowanie, ale zachowuje rozmiar */
-    background-color: transparent !important; /* Przezroczyste tło */
-    color: var(--text); /* Kolor tekstu zgodny z motywem */
-    font-weight: 500;
-    transition: all 0.2s ease-in-out;
+:root[data-theme="dark"] .nav-tabs .nav-link:hover {
+    color: var(--primary);
+    background-color: var(--surface-hover);
+    border-color: var(--border);
 }
 
-/* Styl po najechaniu myszką (Hover) */
-.navbar .btn:hover {
-    background-color: var(--surface-hover) !important; /* Subtelne tło po najechaniu */
-    border-color: var(--border) !important; /* Opcjonalnie: delikatna ramka przy hover */
-    color: var(--primary); /* Zmiana koloru tekstu na wiodący */
-    transform: translateY(-1px); /* Lekkie uniesienie dla efektu klikalności */
+:root[data-theme="dark"] .nav-tabs .nav-link.active {
+    color: var(--primary) !important; /* Aktywna zakładka - kolor wiodący */
+    background-color: var(--surface); /* Ciemne tło (zgodne z kartą) */
+    border-color: var(--border);
+    border-bottom-color: var(--surface); /* "Otwiera" zakładkę do dołu */
 }
 
-/* Specjalny styl dla przycisku "Wyloguj" (jeśli chcesz go wyróżnić) */
-.navbar form .btn {
-    color: var(--danger) !important; /* Czerwony kolor dla wylogowania */
+/* === POPRAWKA: TOM SELECT (Wyszukiwarka userów) W DARK MODE === */
+/* Wymusza ciemne kolory na listach rozwijanych */
+
+:root[data-theme="dark"] .ts-control {
+    background-color: var(--bg) !important;
+    color: var(--text) !important;
+    border-color: var(--border) !important;
 }
 
-.navbar form .btn:hover {
-    background-color: rgba(239, 68, 68, 0.1) !important; /* Czerwonawe tło */
-    border-color: var(--danger) !important;
+:root[data-theme="dark"] .ts-control input {
+    color: var(--text) !important; /* Tekst wpisywany w wyszukiwarkę */
 }
 
-/* Ewentualna korekta dla aktywnego przycisku (jeśli używasz klasy .active lub btn-primary w menu) */
-/* Jeśli "Moje Quizy" ma być wyróżnione jako główna akcja: */
-.navbar .btn-outline-primary {
-    /* Nadpisujemy bootstrapowy outline, żeby pasował do nowego stylu */
-    border-color: transparent !important; 
+:root[data-theme="dark"] .ts-dropdown {
+    background-color: var(--surface) !important;
+    border-color: var(--border) !important;
+    color: var(--text) !important;
+}
+
+:root[data-theme="dark"] .ts-dropdown .option {
+    color: var(--text) !important;
+    background-color: var(--surface);
+}
+
+:root[data-theme="dark"] .ts-dropdown .option.active, 
+:root[data-theme="dark"] .ts-dropdown .active {
+    background-color: var(--surface-hover) !important; /* Podświetlenie elementu */
     color: var(--primary) !important;
 }
 
-.navbar .btn-outline-primary:hover {
-    background-color: var(--primary) !important;
-    color: var(--primary-text) !important;
+/* Ikona usuwania (krzyżyk) w TomSelect */
+:root[data-theme="dark"] .ts-wrapper.plugin-remove_button .item .remove {
+    border-left-color: var(--border) !important;
+    color: var(--text-muted) !important;
 }
+:root[data-theme="dark"] .ts-wrapper.plugin-remove_button .item .remove:hover {
+    background-color: var(--danger) !important;
+    color: #fff !important;
+}
+
+/* === POPRAWKA: GENERATOR AI (WYMUSZENIE KOLORÓW) === */
+
+/* 1. Tekst wpisywany w polu (np. temat) */
+:root[data-theme="dark"] #ai-form .form-control {
+    color: #ffffff !important;           /* Czysta biel dla tekstu */
+    background-color: var(--bg) !important; 
+}
+
+/* 2. Placeholder (tekst "np. Historia Polski...") wewnątrz pola */
+:root[data-theme="dark"] #ai-form .form-control::placeholder {
+    color: rgba(255, 255, 255, 0.6) !important; /* Jasnoszary, półprzezroczysty */
+    opacity: 1;
+}
+
+/* 3. Tekst pod polem (pomocniczy "Np. Historia Polski...") */
+:root[data-theme="dark"] #ai-form .form-text {
+    color: #94a3b8 !important;           /* Jasny szary (Slate-400) */
+}
+
+/* 4. Ikona "Lupki" i "Listy" przy polu */
+:root[data-theme="dark"] #ai-form .input-group-text {
+    background-color: var(--surface-hover) !important;
+    color: #ffffff !important;
+    border-color: var(--border) !important;
+}
+
+/* 5. Naprawa fokusa (po kliknięciu) */
+:root[data-theme="dark"] #ai-form .form-control:focus {
+    background-color: var(--bg) !important;
+    color: #ffffff !important;
+    border-color: var(--primary) !important;
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.25) !important;
+}
+
