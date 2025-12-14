@@ -1,4 +1,11 @@
 # quizzes/tests.py
+"""
+Zestaw testów jednostkowych i integracyjnych dla aplikacji quizzes i accounts.
+
+Zawiera testy sprawdzające logikę importu JSON, procesu rozwiązywania quizów,
+tworzenia pytań oraz podstawowe funkcje kont użytkowników.
+"""
+
 import json
 from django.test import TestCase
 from django.urls import reverse
@@ -11,11 +18,15 @@ User = get_user_model()
 
 
 class QuizImportTests(TestCase):
+    """
+    Testy funkcjonalności importu quizów z plików JSON.
+    """
     
     def setUp(self):
         """
-        Ta metoda jest uruchamiana przed każdym pojedynczym testem w tej klasie.
-        Tworzy izolowane środowisko dla każdego testu.
+        Przygotowuje środowisko testowe przed każdym testem.
+        
+        Tworzy użytkownika (autora), pusty quiz oraz definiuje adresy URL.
         """
         # 1. Stwórz użytkownika, który będzie autorem quizu
         self.user = User.objects.create_user(
@@ -37,7 +48,10 @@ class QuizImportTests(TestCase):
 
     def test_successful_json_import(self):
         """
-        Testuje: Import pytań z poprawnego pliku JSON (Happy Path)
+        Testuje poprawny import pytań z pliku JSON (Happy Path).
+
+        Sprawdza, czy po przesłaniu poprawnego pliku JSON pytania i odpowiedzi
+        są prawidłowo tworzone w bazie danych i przypisywane do quizu.
         """
         self.client.login(username='testauthor', password='testpassword123')
 
@@ -95,8 +109,10 @@ class QuizImportTests(TestCase):
 
     def test_import_validation_error_logic(self):
         """
-        Testuje: Import (negatywny) - błąd walidacji logiki JSON
-        (Pytanie SINGLE z 2 poprawnymi odpowiedziami)
+        Testuje zachowanie systemu przy próbie importu logicznie błędnych danych.
+        
+        Scenariusz: Pytanie typu SINGLE choice z dwiema poprawnymi odpowiedziami.
+        Oczekiwany rezultat: Błąd walidacji i brak zmian w bazie.
         """
         self.client.login(username='testauthor', password='testpassword123')
 
@@ -128,7 +144,7 @@ class QuizImportTests(TestCase):
 
     def test_import_unauthenticated_user(self):
         """
-        Testuje: Import (negatywny) - użytkownik niezalogowany
+        Testuje zabezpieczenie widoku importu przed niezalogowanymi użytkownikami.
         """
         mock_file = SimpleUploadedFile("file.json", b"{}", "application/json")
         
@@ -139,8 +155,14 @@ class QuizImportTests(TestCase):
 
 
 class QuizTakingTests(TestCase):
+    """
+    Testy procesu rozwiązywania quizu i naliczania punktów.
+    """
     
     def setUp(self):
+        """
+        Tworzy quiz z jednym pytaniem jednokrotnym i jednym wielokrotnym.
+        """
         self.user = User.objects.create_user(username='student', password='password123')
         
         self.quiz = Quiz.objects.create(
@@ -170,6 +192,9 @@ class QuizTakingTests(TestCase):
         self.take_url = reverse('quiz-start', kwargs={'pk': self.quiz.pk})
 
     def test_quiz_perfect_score(self):
+        """
+        Testuje scenariusz uzyskania 100% punktów.
+        """
         self.client.login(username='student', password='password123')
 
         form_data = {
@@ -187,6 +212,12 @@ class QuizTakingTests(TestCase):
         self.assertEqual(response.context['score_percent'], 100)
         
     def test_quiz_partial_score(self):
+        """
+        Testuje scenariusz uzyskania częściowego wyniku (50%).
+        
+        Użytkownik odpowiada poprawnie na jedno pytanie, a na drugie częściowo
+        (co w tym systemie liczone jest jako błąd).
+        """
         self.client.login(username='student', password='password123')
 
         form_data = {
@@ -202,6 +233,9 @@ class QuizTakingTests(TestCase):
 
 
 class QuestionCreationTests(TestCase):
+    """
+    Testy tworzenia pytań przez formularz (w tym obsługa Formsetów).
+    """
     def setUp(self):
         self.user = User.objects.create_user(username='teacher', password='password123')
         self.quiz = Quiz.objects.create(title="Test Quiz", author=self.user)
@@ -242,7 +276,7 @@ class QuestionCreationTests(TestCase):
 
     def test_create_question_unhappy_path_single_no_correct(self):
         """
-        Unhappy Path: Pytanie SINGLE bez poprawnej odpowiedzi.
+        Unhappy Path: Próba utworzenia pytania SINGLE bez poprawnej odpowiedzi.
         """
         data = {
             'text': 'Błędne pytanie',
@@ -271,7 +305,7 @@ class QuestionCreationTests(TestCase):
 
     def test_create_question_unhappy_path_multiple_correct_in_single(self):
         """
-        Unhappy Path: Pytanie SINGLE z dwoma poprawnymi odpowiedziami.
+        Unhappy Path: Próba utworzenia pytania SINGLE z dwiema poprawnymi odpowiedziami.
         """
         data = {
             'text': 'Błędne pytanie',
@@ -295,11 +329,15 @@ class QuestionCreationTests(TestCase):
 
 
 # --- NOWE TESTY KONTA UŻYTKOWNIKA (REJESTRACJA, LOGOWANIE, PROFIL) ---
-# --- POPRAWIONE TESTY KONTA UŻYTKOWNIKA ---
 class AccountsTests(TestCase):
+    """
+    Testy funkcjonalności aplikacji accounts.
+    """
 
     def setUp(self):
-        # Tworzymy użytkownika testowego do wykorzystania w testach logowania i profilu
+        """
+        Przygotowanie użytkownika testowego do testów logowania i profilu.
+        """
         self.user = User.objects.create_user(
             username='testuser_acc',
             email='test@example.com',
@@ -313,7 +351,7 @@ class AccountsTests(TestCase):
 
     def test_registration_success(self):
         """
-        Testuje: Rejestracja z poprawnymi danymi tworzy użytkownika i przekierowuje do logowania.
+        Testuje poprawną rejestrację nowego użytkownika.
         """
         data = {
             'username': 'newuser_reg',
@@ -337,7 +375,7 @@ class AccountsTests(TestCase):
 
     def test_registration_duplicate_username(self):
         """
-        Testuje: Próba rejestracji na zajętą nazwę użytkownika zwraca błąd walidacji.
+        Testuje próbę rejestracji na zajętą nazwę użytkownika.
         """
         data = {
             'username': 'testuser_acc', # Ten użytkownik został utworzony w setUp
@@ -359,7 +397,7 @@ class AccountsTests(TestCase):
 
     def test_login_success(self):
         """
-        Testuje: Poprawne logowanie przekierowuje na stronę główną i tworzy sesję.
+        Testuje poprawne logowanie.
         """
         response = self.client.post(self.login_url, {
             'username': 'testuser_acc',
@@ -371,7 +409,7 @@ class AccountsTests(TestCase):
 
     def test_login_failure(self):
         """
-        Testuje: Logowanie złym hasłem nie tworzy sesji i wyświetla błąd.
+        Testuje logowanie z błędnym hasłem.
         """
         response = self.client.post(self.login_url, {
             'username': 'testuser_acc',
@@ -387,7 +425,7 @@ class AccountsTests(TestCase):
 
     def test_profile_view_access_authenticated(self):
         """
-        Testuje: Zalogowany użytkownik ma dostęp do edycji profilu.
+        Testuje dostęp do edycji profilu dla zalogowanego użytkownika.
         """
         self.client.login(username='testuser_acc', password='testpassword123')
         response = self.client.get(self.profile_url)
@@ -396,7 +434,7 @@ class AccountsTests(TestCase):
 
     def test_profile_view_access_anonymous(self):
         """
-        Testuje: Niezalogowany użytkownik jest przekierowywany do logowania.
+        Testuje blokadę dostępu do profilu dla niezalogowanych.
         """
         response = self.client.get(self.profile_url)
         # Sprawdzamy przekierowanie na login z parametrem ?next=
@@ -404,7 +442,7 @@ class AccountsTests(TestCase):
 
     def test_profile_update_success(self):
         """
-        Testuje: Wysłanie formularza edycji profilu aktualizuje dane w bazie.
+        Testuje poprawną aktualizację danych profilowych.
         """
         self.client.login(username='testuser_acc', password='testpassword123')
         
