@@ -2,21 +2,21 @@ site_name: QuizApp Dokumentacja Techniczna
 site_url: http://127.0.0.1:8000/docs/ # Zmień na docelowy adres URL
 
 nav:
-    - Wprowadzenie: index.md
-    - Struktura projektu: structure.md
-    - Technologie i Baza Danych: technologies.md
-    - Dokumentacja Aplikacji:
-        - Użytkownicy (Accounts):
-            - Modele: accounts/models.md
-            - Widoki: accounts/views.md
-        - Quizy (Quizzes):
-            - Modele: quizzes/models.md
-            - Widoki: quizzes/views.md
-            - Formularze: quizzes/forms.md
-    - Dokumentacja Frontend:
-        - JavaScript: frontend/js.md
-        - Style CSS: frontend/css.md
-        - Szablony HTML: frontend/templates.md
+  - Start: index.md
+  - Architektura Systemu:
+      - Struktura Projektu: architecture/structure.md # (Tu wrzuć {{ project_tree() }})
+      - Technologie: architecture/technologies.md
+      - Baza Danych (ERD): architecture/database.md
+  - Dokumentacja API (Reference):
+      - Aplikacja Quizy:
+          - Modele: api/quizzes/models.md
+          - Logika (Views): api/quizzes/views.md
+          - Formularze: api/quizzes/forms.md
+      - Aplikacja Użytkownicy:
+          - Modele: api/accounts/models.md
+          - Widoki: api/accounts/views.md
+  - Frontend:
+      - Style i JS: frontend/assets.md
 
 theme:
   name: material
@@ -61,8 +61,13 @@ markdown_extensions:
   - attr_list
   - admonition
   - pymdownx.details
-  - pymdownx.superfences
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
   - pymdownx.highlight:
       anchor_linenums: true
       line_spans: __span
       pygments_lang_class: true
+  
