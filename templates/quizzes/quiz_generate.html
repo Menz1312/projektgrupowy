@@ -2,37 +2,93 @@
 {% block title %}Generator Quizów AI{% endblock %}
 
 {% block content %}
-<div style="max-width: 600px; margin: 0 auto;">
-    <h1>Generator Quizów AI</h1>
-    <p>Wpisz temat, a sztuczna inteligencja stworzy dla Ciebie quiz.</p>
-
-    <form method="post" style="background: #fff; padding: 2rem; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">
-        {% csrf_token %}
+<div class="row justify-content-center">
+    <div class="col-md-8 col-lg-6">
         
-        {% if form.non_field_errors %}
-            <div style="color: red; margin-bottom: 1rem;">{{ form.non_field_errors }}</div>
-        {% endif %}
-
-        <div style="margin-bottom: 1rem;">
-            <label style="display:block; font-weight:bold; margin-bottom:0.5rem;">{{ form.topic.label }}</label>
-            {{ form.topic }}
-            {% if form.topic.errors %}
-                <div style="color: red">{{ form.topic.errors }}</div>
-            {% endif %}
+        <div class="text-center mb-4">
+            <h1 class="fw-bold"><i class="bi bi-stars text-primary"></i> Generator AI</h1>
+            <p class="text-muted">
+                Wpisz temat, a sztuczna inteligencja przygotuje dla Ciebie gotowy quiz w kilka sekund.
+            </p>
         </div>
 
-        <div style="margin-bottom: 1rem;">
-            <label style="display:block; font-weight:bold; margin-bottom:0.5rem;">{{ form.count.label }}</label>
-            {{ form.count }}
-            {% if form.count.errors %}
-                <div style="color: red">{{ form.count.errors }}</div>
-            {% endif %}
-        </div>
+        <div class="card shadow-sm border-0" style="background-color: var(--surface);">
+            <div class="card-body p-4">
+                <form method="post" id="ai-form">
+                    {% csrf_token %}
+                    
+                    {% if form.non_field_errors %}
+                        <div class="alert alert-danger mb-3">
+                            <i class="bi bi-exclamation-triangle-fill me-2"></i>{{ form.non_field_errors }}
+                        </div>
+                    {% endif %}
 
-        <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 1rem;">Generuj Quiz</button>
-        <p style="font-size: 0.8rem; color: #666; text-align: center; margin-top: 1rem;">
-            To może potrwać chwilę. Proszę nie odświeżać strony.
-        </p>
-    </form>
+                    <div class="mb-4">
+                        <label class="form-label fw-bold small text-muted text-uppercase">
+                            {{ form.topic.label }}
+                        </label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-light border-end-0">
+                                <i class="bi bi-lightbulb"></i>
+                            </span>
+                            {{ form.topic }}
+                        </div>
+                        {% if form.topic.errors %}
+                            <div class="text-danger small mt-1">{{ form.topic.errors }}</div>
+                        {% endif %}
+                        <div class="form-text small">Np. "Historia Polski", "Podstawy Pythona", "Stolice Europy"</div>
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="form-label fw-bold small text-muted text-uppercase">
+                            {{ form.count.label }}
+                        </label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-light border-end-0">
+                                <i class="bi bi-list-ol"></i>
+                            </span>
+                            {{ form.count }}
+                        </div>
+                        {% if form.count.errors %}
+                            <div class="text-danger small mt-1">{{ form.count.errors }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="d-grid gap-2">
+                        <button type="submit" class="btn btn-primary btn-lg shadow-sm" id="submit-btn">
+                            <span class="normal-state">
+                                <i class="bi bi-magic me-2"></i> Generuj Quiz
+                            </span>
+                            <span class="loading-state d-none">
+                                <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                                Generowanie...
+                            </span>
+                        </button>
+                    </div>
+
+                    <p class="text-center mt-3 mb-0 small text-muted">
+                        <i class="bi bi-info-circle"></i> To może potrwać od 5 do 15 sekund.
+                    </p>
+                </form>
+            </div>
+        </div>
+    </div>
 </div>
+
+<script>
+    document.getElementById('ai-form').addEventListener('submit', function(e) {
+        const btn = document.getElementById('submit-btn');
+        const normalState = btn.querySelector('.normal-state');
+        const loadingState = btn.querySelector('.loading-state');
+        const inputs = this.querySelectorAll('input, select, button');
+
+        // Pokaż stan ładowania
+        normalState.classList.add('d-none');
+        loadingState.classList.remove('d-none');
+        
+        // Zablokuj formularz, aby nie wysłać dwa razy
+        inputs.forEach(input => input.style.pointerEvents = 'none');
+        btn.classList.add('disabled');
+    });
+</script>
 {% endblock %}
