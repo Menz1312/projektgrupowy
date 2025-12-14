@@ -4,7 +4,7 @@ site_url: http://127.0.0.1:8000/docs/ # Zmień na docelowy adres URL
 nav:
   - Start: index.md
   - Architektura Systemu:
-      - Struktura Projektu: architecture/structure.md # (Tu wrzuć {{ project_tree() }})
+      - Struktura Projektu: architecture/structure.md
       - Technologie: architecture/technologies.md
       - Baza Danych (ERD): architecture/database.md
   - Dokumentacja API (Reference):
@@ -12,9 +12,15 @@ nav:
           - Modele: api/quizzes/models.md
           - Logika (Views): api/quizzes/views.md
           - Formularze: api/quizzes/forms.md
+          - Admin: api/quizzes/admin.md
+          - Konfiguracja (Apps): api/quizzes/apps.md
+          - Testy: api/quizzes/tests.md
       - Aplikacja Użytkownicy:
           - Modele: api/accounts/models.md
           - Widoki: api/accounts/views.md
+          - Formularze: api/accounts/forms.md
+          - Admin: api/accounts/admin.md
+          - Konfiguracja (Apps): api/accounts/apps.md
   - Frontend:
       - Style i JS: frontend/assets.md
 
