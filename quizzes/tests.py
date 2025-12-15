@@ -487,7 +487,7 @@ class QuizAccessTests(TestCase):
             visibility='PRIVATE'
         )
 
-        # --- POPRAWKA: Dodajemy pytania do quizów ---
+        
         # Widok quiz_take_view przekierowuje (302) jeśli quiz nie ma pytań.
         # Aby otrzymać status 200, quiz musi mieć przynajmniej jedno pytanie.
         Question.objects.create(quiz=self.quiz_public, text="Pytanie publiczne", question_type='SINGLE')
@@ -500,7 +500,7 @@ class QuizAccessTests(TestCase):
 
     def test_public_quiz_access(self):
         """
-        Test 1: Dostęp do quizu publicznego.
+        Dostęp do quizu publicznego.
         - Jest widoczny na stronie głównej.
         - can_view zwraca True.
         - Widoki detail i start są dostępne (status 200).
@@ -527,7 +527,7 @@ class QuizAccessTests(TestCase):
 
     def test_private_quiz_logic(self):
         """
-        Test 2: Logika quizu prywatnego.
+        Logika quizu prywatnego.
         - Nie jest widoczny na home_view.
         - can_view zwraca False dla nieuprawnionego (User B).
         - Próba wejścia skutkuje przekierowaniem.
@@ -554,7 +554,7 @@ class QuizAccessTests(TestCase):
 
     def test_shared_quiz_access(self):
         """
-        Test 3: Dostęp do quizu udostępnionego.
+        Dostęp do quizu udostępnionego.
         - Nadajemy uprawnienie VIEWER dla User B.
         - Quiz pojawia się w 'Moje Quizy' (sekcja udostępnione).
         - can_view zwraca True.
