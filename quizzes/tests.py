@@ -11,7 +11,7 @@ from django.test import TestCase
 from django.urls import reverse
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
-from .models import Quiz, Question, Answer
+from .models import Quiz, Question, Answer, QuizUserPermission
 
 # Pobieramy model użytkownika zdefiniowany w settings.py
 User = get_user_model()
@@ -454,7 +454,7 @@ class AccountsTests(TestCase):
         
         response = self.client.post(self.profile_url, new_data)
         
-        # Oczekujemy przekierowania na tę samą stronę (sukces) - w widoku profile_edit_view jest return redirect('profile_edit')
+        # Oczekujemy przekierowania na tę samą stronę (sukces)
         self.assertRedirects(response, self.profile_url)
         
         # Odświeżamy obiekt z bazy i sprawdzamy zmiany
@@ -462,3 +462,131 @@ class AccountsTests(TestCase):
         self.assertEqual(self.user.first_name, 'Jan')
         self.assertEqual(self.user.last_name, 'Kowalski')
         self.assertEqual(self.user.email, 'nowy@email.com')
+
+
+class QuizAccessTests(TestCase):
+    """
+    Testy sprawdzające logikę dostępu do quizów (Publiczne, Prywatne, Udostępnione).
+    """
+
+    def setUp(self):
+        # Tworzymy dwóch użytkowników
+        self.user_a = User.objects.create_user(username='autor', password='password123')
+        self.user_b = User.objects.create_user(username='inny_user', password='password123')
+
+        # Tworzymy quizy
+        self.quiz_public = Quiz.objects.create(
+            title="Quiz Publiczny",
+            author=self.user_a,
+            visibility='PUBLIC'
+        )
+        
+        self.quiz_private = Quiz.objects.create(
+            title="Quiz Prywatny",
+            author=self.user_a,
+            visibility='PRIVATE'
+        )
+
+        # --- POPRAWKA: Dodajemy pytania do quizów ---
+        # Widok quiz_take_view przekierowuje (302) jeśli quiz nie ma pytań.
+        # Aby otrzymać status 200, quiz musi mieć przynajmniej jedno pytanie.
+        Question.objects.create(quiz=self.quiz_public, text="Pytanie publiczne", question_type='SINGLE')
+        Question.objects.create(quiz=self.quiz_private, text="Pytanie prywatne", question_type='SINGLE')
+        # --------------------------------------------
+
+        # URL-e
+        self.home_url = reverse('home')
+        self.my_quizzes_url = reverse('my-quizzes')
+
+    def test_public_quiz_access(self):
+        """
+        Test 1: Dostęp do quizu publicznego.
+        - Jest widoczny na stronie głównej.
+        - can_view zwraca True.
+        - Widoki detail i start są dostępne (status 200).
+        """
+        # 1. Sprawdź widoczność w home_view
+        response = self.client.get(self.home_url)
+        self.assertContains(response, self.quiz_public.title)
+        
+        # 2. Sprawdź funkcję logiczną _can_view_quiz (metoda modelu can_view)
+        # Nawet niezalogowany (lub user_b) powinien mieć dostęp
+        self.assertTrue(self.quiz_public.can_view(self.user_b))
+
+        # 3. Sprawdź dostęp do widoków (jako zalogowany user_b)
+        self.client.login(username='inny_user', password='password123')
+        
+        detail_url = reverse('quiz-detail', kwargs={'pk': self.quiz_public.pk})
+        take_url = reverse('quiz-start', kwargs={'pk': self.quiz_public.pk})
+
+        response_detail = self.client.get(detail_url)
+        self.assertEqual(response_detail.status_code, 200)
+
+        response_take = self.client.get(take_url)
+        self.assertEqual(response_take.status_code, 200)
+
+    def test_private_quiz_logic(self):
+        """
+        Test 2: Logika quizu prywatnego.
+        - Nie jest widoczny na home_view.
+        - can_view zwraca False dla nieuprawnionego (User B).
+        - Próba wejścia skutkuje przekierowaniem.
+        """
+        # 1. Sprawdź brak widoczności w home_view
+        response = self.client.get(self.home_url)
+        self.assertNotContains(response, self.quiz_private.title)
+
+        # 2. Sprawdź funkcję logiczną
+        self.assertFalse(self.quiz_private.can_view(self.user_b))
+
+        # 3. Próba wejścia na widok (jako User B)
+        self.client.login(username='inny_user', password='password123')
+        detail_url = reverse('quiz-detail', kwargs={'pk': self.quiz_private.pk})
+        
+        response = self.client.get(detail_url)
+        
+        # Oczekujemy przekierowania (do home, bo brak uprawnień)
+        self.assertRedirects(response, self.home_url)
+        
+        # Opcjonalnie: sprawdź czy pojawił się komunikat (Messages framework)
+        messages = list(response.wsgi_request._messages)
+        self.assertTrue(any("Nie masz uprawnień" in str(m) for m in messages))
+
+    def test_shared_quiz_access(self):
+        """
+        Test 3: Dostęp do quizu udostępnionego.
+        - Nadajemy uprawnienie VIEWER dla User B.
+        - Quiz pojawia się w 'Moje Quizy' (sekcja udostępnione).
+        - can_view zwraca True.
+        - Użytkownik B może wejść na widoki.
+        """
+        # 1. Autor (A) udostępnia quiz użytkownikowi B
+        # Używamy modelu QuizUserPermission zamiast usuniętego pola shared_with
+        QuizUserPermission.objects.create(
+            quiz=self.quiz_private,
+            user=self.user_b,
+            role='VIEWER'
+        )
+
+        # 2. Logujemy się jako User B
+        self.client.login(username='inny_user', password='password123')
+
+        # 3. Sprawdź czy quiz jest na liście 'Moje Quizy' (shared_quizzes)
+        response = self.client.get(self.my_quizzes_url)
+        self.assertContains(response, self.quiz_private.title)
+        # Sprawdzamy czy trafił do odpowiedniej sekcji w kontekście szablonu
+        self.assertIn(self.quiz_private, response.context['shared_quizzes'])
+
+        # 4. Sprawdź funkcję logiczną
+        # User B ma teraz wpis w tabeli uprawnień, więc powinno być True
+        self.assertTrue(self.quiz_private.can_view(self.user_b))
+
+        # 5. Sprawdź wejście na widoki
+        detail_url = reverse('quiz-detail', kwargs={'pk': self.quiz_private.pk})
+        take_url = reverse('quiz-start', kwargs={'pk': self.quiz_private.pk})
+
+        response_detail = self.client.get(detail_url)
+        self.assertEqual(response_detail.status_code, 200)
+
+        response_take = self.client.get(take_url)
+        self.assertEqual(response_take.status_code, 200)
