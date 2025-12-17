@@ -28,30 +28,23 @@ load_dotenv()
 HF_TOKEN = os.getenv("HF_TOKEN")
 HF_API_URL = "https://router.huggingface.co/v1/chat/completions"
 
-def home_view(request: HttpRequest) -> HttpResponse:
-    """
-    Widok strony głównej aplikacji.
-
-    Wyświetla listę publicznych quizów. Obsługuje również wyszukiwanie quizów po tytule.
-    Wyniki są ograniczone do 10 najnowszych quizów.
-
-    Args:
-        request (HttpRequest): Obiekt żądania HTTP. Parametr GET 'q' służy do wyszukiwania.
-
-    Returns:
-        HttpResponse: Wyrenderowany szablon 'home.html' z listą quizów.
-    """
+def home_view(request):
     query = request.GET.get('q', '')
     
-    # Pobieramy publiczne quizy, filtrujemy po tytule (jesli jest zapytanie),
-    # sortujemy od najnowszych (-id) i bierzemy tylko pierwsze 10.
-    quizzes = Quiz.objects.filter(
-        visibility='PUBLIC', 
-        title__icontains=query
-    ).order_by('-id')[:10]
+    # Baza zapytań (tylko publiczne + wyszukiwanie)
+    base_qs = Quiz.objects.filter(visibility='PUBLIC', title__icontains=query)
+    
+    # 1. GÓRNY PANEL: Najnowsze (ostatnie 24 sztuki)
+    latest_quizzes = base_qs.order_by('-id')[:3]
+
+    # 2. DOLNY PANEL: Losowe / Proponowane (24 sztuki)
+    # Używamy order_by('?') do losowania. 
+    # Jeśli wolisz alfabetycznie, zmień '?' na 'title'.
+    random_quizzes = base_qs.order_by('?')[:24]
     
     return render(request, 'home.html', {
-        'quizzes': quizzes,
+        'latest_quizzes': latest_quizzes,
+        'random_quizzes': random_quizzes,
         'query': query
     })
 
