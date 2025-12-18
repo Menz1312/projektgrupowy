@@ -2,7 +2,7 @@
 
 Warstwa prezentacji aplikacji QuizApp oparta jest na silniku szablonów Django (DTL) wspieranym przez framework CSS Bootstrap 5. Aplikacja wykorzystuje hybrydowe podejście do zarządzania zasobami: biblioteki zewnętrzne ładowane są z sieci CDN, a style i skrypty specyficzne dla projektu znajdują się w katalogu lokalnym.
 
-## 📂 Struktura Katalogów
+## Struktura Katalogów
 
 Zasoby frontendowe są podzielone na dwa główne katalogi: `static` (pliki serwowane bezpośrednio) oraz `templates` (pliki HTML renderowane przez Django).
 
@@ -23,7 +23,7 @@ projektgrupowy/
 
 ---
 
-## 🎨 Style i Motywy (CSS)
+## Style i Motywy (CSS)
 
 Głównym arkuszem stylów jest plik `static/css/style.css`. Projekt wykorzystuje natywne zmienne CSS (CSS Variables) do obsługi dynamicznej zmiany motywu (Jasny/Ciemny).
 
@@ -55,7 +55,7 @@ Projekt korzysta z Bootstrapa ładowanego z CDN (JSDelivr) w pliku `base.html`.
 
 ---
 
-## 📜 Skrypty JavaScript
+## Skrypty JavaScript
 
 Logika po stronie klienta (Client-side) została ograniczona do niezbędnego minimum, aby zapewnić szybkość działania i interaktywność interfejsu.
 
@@ -73,7 +73,7 @@ Prosty skrypt zarządzający wyświetlaniem bannera informacyjnego o plikach coo
 
 ---
 
-## 🧩 Szablony (Templates)
+## Szablony (Templates)
 
 System szablonów oparty jest na **dziedziczeniu**. Główny plik `base.html` definiuje szkielet strony HTML5, a pozostałe szablony jedynie wypełniają zdefiniowane w nim bloki.
 

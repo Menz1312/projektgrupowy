@@ -36,10 +36,6 @@ Formularze używane w widoku edycji i tworzenia pytań (`QuestionCreateView`, `Q
       show_root_heading: true
       members: false
 
-::: quizzes.forms.AnswerFormSet
-    options:
-      show_root_heading: true
-
 ## Zarządzanie Grupami
 
 ::: quizzes.forms.QuizGroupForm
