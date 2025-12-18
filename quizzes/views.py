@@ -15,6 +15,7 @@ from django.core.exceptions import ValidationError, PermissionDenied
 from django.views.decorators.http import require_POST
 from django.contrib.auth import get_user_model
 from django.db.models import Q
+from django.core.paginator import Paginator  # <--- Dodany import
 
 from .models import Quiz, Question, Answer, QuizAttempt, QuizGroup, QuizUserPermission, QuizGroupPermission
 from .forms import (
@@ -28,22 +29,55 @@ load_dotenv()
 HF_TOKEN = os.getenv("HF_TOKEN")
 HF_API_URL = "https://router.huggingface.co/v1/chat/completions"
 
-def home_view(request):
+def home_view(request: HttpRequest) -> HttpResponse:
+    """
+    Wyświetla stronę główną z listą quizów dostępnych dla użytkownika.
+
+    Funkcja pobiera wszystkie quizy publiczne oraz, w przypadku zalogowanych
+    użytkowników, quizy prywatne udostępnione im do rozwiązania (bezpośrednio
+    lub poprzez grupy). Lista jest filtrowana na podstawie zapytania
+    wyszukiwania, sortowana od najnowszych i stronicowana (9 elementów na stronę).
+
+    Args:
+        request (HttpRequest): Obiekt żądania HTTP zawierający parametry GET
+            (zapytanie 'q' oraz numer strony 'page').
+
+    Returns:
+        HttpResponse: Wyrenderowany szablon 'home.html' zawierający obiekt
+            strony z quizami ('page_obj') oraz listę najnowszych quizów ('latest_quizzes').
+    """
     query = request.GET.get('q', '')
     
-    # Baza zapytań (tylko publiczne + wyszukiwanie)
-    base_qs = Quiz.objects.filter(visibility='PUBLIC', title__icontains=query)
-    
-    # 1. GÓRNY PANEL: Najnowsze (ostatnie 24 sztuki)
-    latest_quizzes = base_qs.order_by('-id')[:3]
+    # 1. Budowanie filtru dostępności
+    # Domyślnie każdy widzi quizy publiczne
+    permission_filter = Q(visibility='PUBLIC')
 
-    # 2. DOLNY PANEL: Losowe / Proponowane (24 sztuki)
-    # Używamy order_by('?') do losowania. 
-    random_quizzes = base_qs.order_by('?')[:24]
+    if request.user.is_authenticated:
+        # Dla zalogowanych dodajemy:
+        # - quizy, których są autorami
+        # - quizy udostępnione im bezpośrednio (w tabeli QuizUserPermission)
+        # - quizy udostępnione grupom, do których należą
+        user_groups = request.user.group_memberships.all()
+        
+        permission_filter |= Q(author=request.user)
+        permission_filter |= Q(quizuserpermission__user=request.user)
+        permission_filter |= Q(quizgrouppermission__group__in=user_groups)
+
+    # 2. Pobranie i filtrowanie quizów
+    # distinct() jest konieczne, ponieważ łączenia (join) przez uprawnienia mogą generować duplikaty
+    quizzes = Quiz.objects.filter(permission_filter).filter(title__icontains=query).distinct().order_by('-id')
+
+    # 3. GÓRNY PANEL: Najnowsze PUBLICZNE (pozostawiamy jako wyróżnione/dekorację)
+    latest_quizzes = Quiz.objects.filter(visibility='PUBLIC', title__icontains=query).order_by('-id')[:3]
+
+    # 4. DOLNY PANEL: Paginacja głównej listy (zamiast losowych)
+    paginator = Paginator(quizzes, 9) # 9 quizów na stronę
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
     
     return render(request, 'home.html', {
         'latest_quizzes': latest_quizzes,
-        'random_quizzes': random_quizzes,
+        'page_obj': page_obj,  # Przekazujemy obiekt strony zamiast random_quizzes
         'query': query
     })
 
