@@ -12,7 +12,7 @@ Poniżej znajduje się aktualna struktura plików wygenerowana automatycznie z r
 
 ## Opis Kluczowych Modułów
 
-### 📂 Główne Aplikacje
+### Główne Aplikacje
 
 Projekt składa się z dwóch głównych aplikacji Django (Apps), co zapewnia separację odpowiedzialności:
 
@@ -21,7 +21,7 @@ Projekt składa się z dwóch głównych aplikacji Django (Apps), co zapewnia se
 | **`accounts/`** | **Zarządzanie Użytkownikami.** <br> Odpowiada za rejestrację, logowanie, wylogowywanie oraz edycję profilu. Zawiera niestandardowy model użytkownika (`User`) rozszerzający `AbstractUser`. |
 | **`quizzes/`** | **Logika Biznesowa (Core).** <br> Serce aplikacji. Zawiera modele Quizów, Pytań, Odpowiedzi oraz mechanizmy generowania quizów przez AI i zliczania wyników (QuizAttempt). |
 
-### ⚙️ Konfiguracja i Narzędzia
+### Konfiguracja i Narzędzia
 
 | Katalog/Plik | Opis |
 | :--- | :--- |
