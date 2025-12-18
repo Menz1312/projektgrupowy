@@ -10,17 +10,17 @@ nav:
   - Dokumentacja API (Reference):
       - Aplikacja Quizy:
           - Modele: api/quizzes/models.md
-          - Logika (Views): api/quizzes/views.md
+          - Widoki: api/quizzes/views.md
           - Formularze: api/quizzes/forms.md
           - Admin: api/quizzes/admin.md
-          - Konfiguracja (Apps): api/quizzes/apps.md
+          - Konfiguracja: api/quizzes/apps.md
           - Testy: api/quizzes/tests.md
       - Aplikacja Użytkownicy:
           - Modele: api/accounts/models.md
           - Widoki: api/accounts/views.md
           - Formularze: api/accounts/forms.md
           - Admin: api/accounts/admin.md
-          - Konfiguracja (Apps): api/accounts/apps.md
+          - Konfiguracja: api/accounts/apps.md
   - Frontend:
       - Style i JS: frontend/assets.md
 

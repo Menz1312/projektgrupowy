@@ -327,8 +327,6 @@ class QuestionCreationTests(TestCase):
         self.assertEqual(Question.objects.count(), 0)
         self.assertContains(response, "Pytanie jednokrotnego wyboru musi mieć dokładnie jedną poprawną odpowiedź")
 
-
-# --- NOWE TESTY KONTA UŻYTKOWNIKA (REJESTRACJA, LOGOWANIE, PROFIL) ---
 class AccountsTests(TestCase):
     """
     Testy funkcjonalności aplikacji accounts.
@@ -347,8 +345,6 @@ class AccountsTests(TestCase):
         self.login_url = reverse('login')
         self.profile_url = reverse('profile_edit')
 
-    # --- 1. REJESTRACJA ---
-
     def test_registration_success(self):
         """
         Testuje poprawną rejestrację nowego użytkownika.
@@ -356,7 +352,7 @@ class AccountsTests(TestCase):
         data = {
             'username': 'newuser_reg',
             'email': 'new@example.com',
-            # POPRAWKA: Django UserCreationForm wymaga pól 'password1' i 'password2'
+            # Django UserCreationForm wymaga pól 'password1' i 'password2'
             'password1': 'StrongPassword123!',
             'password2': 'StrongPassword123!',
         }
@@ -393,8 +389,6 @@ class AccountsTests(TestCase):
         form = response.context['form']
         self.assertTrue(form.errors)
 
-    # --- 2. LOGOWANIE ---
-
     def test_login_success(self):
         """
         Testuje poprawne logowanie.
@@ -420,8 +414,6 @@ class AccountsTests(TestCase):
         self.assertNotIn('_auth_user_id', self.client.session)
         # AuthenticationForm zwykle przekazuje błędy w kontekście pod kluczem 'form'
         self.assertTrue(response.context['form'].errors)
-
-    # --- 3. EDYCJA PROFILU ---
 
     def test_profile_view_access_authenticated(self):
         """

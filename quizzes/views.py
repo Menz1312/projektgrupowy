@@ -39,7 +39,6 @@ def home_view(request):
 
     # 2. DOLNY PANEL: Losowe / Proponowane (24 sztuki)
     # Używamy order_by('?') do losowania. 
-    # Jeśli wolisz alfabetycznie, zmień '?' na 'title'.
     random_quizzes = base_qs.order_by('?')[:24]
     
     return render(request, 'home.html', {
@@ -638,7 +637,6 @@ def quiz_take_view(request: HttpRequest, pk: int) -> HttpResponse:
     time_limit_seconds = quiz.time_limit * 60
 
     if request.method == 'POST':
-        # --- LOGIKA ZAPISU WYNIKU (Bez zmian) ---
         # Pobieramy ID pytań, które faktycznie brały udział w losowaniu
         question_ids_str = request.POST.get('question_ids_included', '')
         
@@ -654,7 +652,7 @@ def quiz_take_view(request: HttpRequest, pk: int) -> HttpResponse:
         if not questions_to_grade:
             questions_to_grade = quiz.questions.prefetch_related('answers')
 
-        total = len(questions_to_grade) # ### Teraz total to np. 15, a nie 50
+        total = len(questions_to_grade)
         correct_count = 0
         details = []
 
@@ -663,7 +661,6 @@ def quiz_take_view(request: HttpRequest, pk: int) -> HttpResponse:
             correct_ids = set(question.answers.filter(is_correct=True).values_list('id', flat=True))
             chosen_ids = set()
             
-            # Pobieranie chosen_ids z request.POST (Twoja logika)...
             if question.question_type == 'SINGLE':
                  val = request.POST.get(field)
                  if val: chosen_ids.add(int(val))
@@ -677,7 +674,7 @@ def quiz_take_view(request: HttpRequest, pk: int) -> HttpResponse:
             
             details.append({
                 'question': question,
-                'answers': list(question.answers.all()), # Tu można dodać .order_by('?') jeśli chcesz mieszać odpowiedzi na ekranie wyniku
+                'answers': list(question.answers.all()),
                 'chosen_ids': chosen_ids,
                 'correct_ids': correct_ids,
                 'is_correct': is_correct,
@@ -720,7 +717,6 @@ def quiz_take_view(request: HttpRequest, pk: int) -> HttpResponse:
             selected_questions = all_questions
 
         # ### GENEROWANIE STRINGA ID ###
-        # To jest kluczowe dla template'u - tworzymy string np. "10,4,22"
         selected_ids_str = ",".join(str(q.id) for q in selected_questions)
 
         # Przygotowanie JSON dla JS
@@ -882,7 +878,6 @@ def quiz_import_json_view(request: HttpRequest, pk: int) -> HttpResponse:
                     raise ValidationError(
                         f"Pytanie {q_num} ('{text[:30]}...'): Typ 'Wielokrotny wybór' musi mieć przynajmniej 1 poprawną odpowiedź."
                     )
-            # ---------------------------------
             
             questions_to_create.append({
                 'q_obj': Question(quiz=quiz, text=text, explanation=explanation, question_type=question_type),
