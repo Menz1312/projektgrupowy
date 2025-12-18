@@ -3,38 +3,79 @@
 
 {% block content %}
 <style>
+    /* Stylizacja kart formularza (zapożyczona z quiz_form.html) */
+    .form-card {
+        background-color: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        box-shadow: var(--shadow);
+        padding: 1.5rem;
+        margin-bottom: 2rem;
+        transition: background-color 0.3s;
+    }
+
+    /* Stylizacja nagłówków sekcji */
+    .form-section-title {
+        font-size: 1.1rem;
+        font-weight: 700;
+        color: var(--text-muted);
+        margin-bottom: 1rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        border-bottom: 1px solid var(--border);
+        padding-bottom: 0.5rem;
+    }
+
     /* Stylizacja kontenera pojedynczej odpowiedzi */
     .answer-card {
-        background-color: var(--bg);      /* Tło dopasowane do motywu */
-        border: 1px solid var(--border);  /* Ramka dopasowana do motywu */
-        border-radius: 8px;
+        background-color: var(--bg);
+        border: 1px solid var(--border);
+        border-radius: 12px;
         padding: 1.5rem;
         margin-bottom: 1rem;
         position: relative;
-        transition: background-color 0.3s, border-color 0.3s;
+        transition: all 0.2s;
     }
-
-    /* Ukrywanie checkboxa DELETE (standardowe Django) */
-    label[for$="-DELETE"], input[id$="-DELETE"] {
-        display: none;
-    }
-
-    /* Ukrywanie wiersza, który został oznaczony do usunięcia */
+    
+    /* Ukrywanie wiersza oznaczonego do usunięcia */
     .answer-card.hidden {
         display: none !important;
     }
 
-    /* Stylizacja nagłówków wewnątrz formularza */
-    .form-section-header {
-        color: var(--text-muted);
-        text-transform: uppercase;
-        font-size: 0.85rem;
-        font-weight: 700;
-        letter-spacing: 0.5px;
-        margin-top: 2rem;
-        margin-bottom: 1rem;
-        border-bottom: 1px solid var(--border);
-        padding-bottom: 0.5rem;
+    /* --- Toggle Buttons (Style z quiz_form.html) --- */
+    .toggle-label {
+        width: 100%; 
+        text-align: left; 
+        padding: 1rem; 
+        border-radius: 10px;
+        display: flex; 
+        align-items: center; 
+        justify-content: space-between;
+        font-weight: 600; 
+        transition: all 0.2s; 
+        border: 1px solid var(--border);
+        background-color: var(--surface); 
+        color: var(--text); 
+        cursor: pointer;
+    }
+    .toggle-label:hover { 
+        background-color: var(--surface-hover); 
+    }
+    
+    /* Stan zaznaczony (Checked) */
+    .btn-check:checked + .toggle-label {
+        background-color: rgba(79, 70, 229, 0.1);
+        border-color: var(--primary);
+        color: var(--primary);
+    }
+    
+    .toggle-icon { 
+        font-size: 1.2rem;
+        opacity: 0.3; /* Domyślnie lekko widoczna */
+    }
+    .btn-check:checked + .toggle-label .toggle-icon {
+        opacity: 1; /* Pełna widoczność po zaznaczeniu */
+        color: var(--primary);
     }
 </style>
 
@@ -42,88 +83,164 @@
     <a href="{% url 'quiz-edit' quiz.pk %}" class="text-decoration-none text-muted mb-2 d-inline-block">
         <i class="bi bi-arrow-left"></i> Wróć do edytora quizu
     </a>
-    <h1>{% if form.instance.pk %}Edytuj{% else %}Dodaj{% endif %} Pytanie do quizu</h1>
+    <h1>{% if form.instance.pk %}Edytuj{% else %}Dodaj{% endif %} Pytanie</h1>
     <p class="text-muted">Quiz: <strong>{{ quiz.title }}</strong></p>
 </div>
 
-<div class="card shadow-sm border-0" style="background-color: var(--surface);">
-    <div class="card-body p-4">
-        <form method="post" novalidate>
-            {% csrf_token %}
-            
-            <div class="mb-4">
-                {{ question_form.as_p }}
-            </div>
+<form method="post" novalidate>
+    {% csrf_token %}
 
-            <h3 class="form-section-header">Odpowiedzi</h3>
-            <p class="small text-muted mb-3">
-              Ustaw od 2 do 10 odpowiedzi. Zaznacz, która jest poprawna.
-            </p>
-            
-            {% if answer_formset.non_form_errors %}
-                <div class="alert alert-danger">
-                    {{ answer_formset.non_form_errors }}
-                </div>
+    <div class="form-card">
+        <h3 class="form-section-title"><i class="bi bi-question-circle"></i> Treść Pytania</h3>
+        
+        <div class="mb-4">
+            <label class="form-label fw-bold">{{ question_form.text.label }}</label>
+            {{ question_form.text }}
+            {% if question_form.text.errors %}
+                <div class="text-danger small mt-1">{{ question_form.text.errors }}</div>
             {% endif %}
+        </div>
 
-            {{ answer_formset.management_form }}
+        <div class="mb-4">
+            <label class="form-label fw-bold">{{ question_form.explanation.label }}</label>
+            {{ question_form.explanation }}
+            {% if question_form.explanation.errors %}
+                <div class="text-danger small mt-1">{{ question_form.explanation.errors }}</div>
+            {% endif %}
+        </div>
 
-            <div id="answer-formset-container">
-                {% for form in answer_formset %}
-                    <div class="answer-card {% if form.DELETE.value %}hidden{% endif %}">
-                        {{ form.id }}
-                        {{ form.DELETE }}
-                        
-                        <div class="row align-items-center">
-                            {% for field in form.visible_fields %}
-                                <div class="col-md-12 mb-2">
-                                    <label class="form-label small fw-bold text-muted">{{ field.label }}</label>
-                                    {{ field }}
-                                    {% if field.errors %}
-                                        <div class="text-danger small mt-1">{{ field.errors }}</div>
-                                    {% endif %}
-                                </div>
-                            {% endfor %}
-                        </div>
-                        
-                        <div class="mt-2 text-end">
-                            <button type="button" class="btn btn-outline-danger btn-sm remove-answer-btn">
-                                <i class="bi bi-trash"></i> Usuń odpowiedź
-                            </button>
-                        </div>
-                    </div>
+        <div class="mb-2">
+            <label class="form-label fw-bold mb-2">{{ question_form.question_type.label }}</label>
+            <div class="row g-2">
+                {% for radio in question_form.question_type %}
+                <div class="col-md-6">
+                    <input type="radio" 
+                           name="{{ radio.data.name }}" 
+                           id="{{ radio.id_for_label }}" 
+                           value="{{ radio.data.value }}" 
+                           class="btn-check"
+                           {% if radio.data.selected %}checked{% endif %}>
+                    
+                    <label class="toggle-label" for="{{ radio.id_for_label }}">
+                        <span>
+                            {% if radio.data.value == 'SINGLE' %}
+                                <i class="bi bi-check-circle me-2"></i>
+                            {% elif radio.data.value == 'MULTIPLE' %}
+                                <i class="bi bi-check-all me-2"></i>
+                            {% else %}
+                                <i class="bi bi-list-ul me-2"></i>
+                            {% endif %}
+                            {{ radio.choice_label }}
+                        </span>
+                        <i class="bi bi-check-circle-fill toggle-icon"></i>
+                    </label>
+                </div>
                 {% endfor %}
             </div>
-            
-            <div class="d-flex gap-2 mt-4 pt-3 border-top" style="border-color: var(--border) !important;">
-                <button type="button" id="add-answer-btn" class="btn btn-secondary">
-                    <i class="bi bi-plus-lg"></i> Dodaj odpowiedź
-                </button>
-                <button type="submit" class="btn btn-primary px-4">
-                    <i class="bi bi-check-lg"></i> Zapisz Pytanie
-                </button>
-            </div>
-        </form>
+            {% if question_form.question_type.errors %}
+                <div class="text-danger small mt-1">{{ question_form.question_type.errors }}</div>
+            {% endif %}
+        </div>
     </div>
-</div>
 
-<template id="answer-form-template">
-     <div class="answer-card">
-        {{ answer_formset.empty_form.id }}
-        {{ answer_formset.empty_form.DELETE }}
+    <div class="form-card">
+        <h3 class="form-section-title"><i class="bi bi-ui-checks"></i> Odpowiedzi</h3>
+        <p class="small text-muted mb-4">
+          Zdefiniuj odpowiedzi. Zaznacz przyciskiem "Poprawna odpowiedź" te, które są właściwe.
+        </p>
         
-        <div class="row align-items-center">
-            {% for field in answer_formset.empty_form.visible_fields %}
-                <div class="col-md-12 mb-2">
-                    <label class="form-label small fw-bold text-muted">{{ field.label }}</label>
-                    {{ field }}
+        {% if answer_formset.non_form_errors %}
+            <div class="alert alert-danger">
+                {{ answer_formset.non_form_errors }}
+            </div>
+        {% endif %}
+
+        {{ answer_formset.management_form }}
+
+        <div id="answer-formset-container">
+            {% for form in answer_formset %}
+                <div class="answer-card {% if form.DELETE.value %}hidden{% endif %}">
+                    {{ form.id }}
+                    <div class="d-none">{{ form.DELETE }}</div>
+                    
+                    <div class="row">
+                        <div class="col-12 mb-3">
+                            <label class="form-label small fw-bold text-muted">Treść odpowiedzi</label>
+                            {{ form.text }}
+                            {% if form.text.errors %}
+                                <div class="text-danger small mt-1">{{ form.text.errors }}</div>
+                            {% endif %}
+                        </div>
+
+                        <div class="col-12">
+                            <input type="checkbox" 
+                                   name="{{ form.is_correct.html_name }}" 
+                                   id="{{ form.is_correct.id_for_label }}" 
+                                   class="btn-check"
+                                   {% if form.is_correct.value %}checked{% endif %}>
+                            
+                            <label class="toggle-label py-2" for="{{ form.is_correct.id_for_label }}">
+                                <span>
+                                    <i class="bi bi-check-lg me-2"></i> Poprawna odpowiedź
+                                </span>
+                                <i class="bi bi-check-square-fill toggle-icon"></i>
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <div class="mt-3 text-end border-top pt-2" style="border-color: var(--border) !important;">
+                        <button type="button" class="btn btn-outline-danger btn-sm remove-answer-btn">
+                            <i class="bi bi-trash"></i> Usuń tę odpowiedź
+                        </button>
+                    </div>
                 </div>
             {% endfor %}
         </div>
         
-        <div class="mt-2 text-end">
+        <div class="mt-4">
+            <button type="button" id="add-answer-btn" class="btn btn-outline-primary dashed-border w-100 py-3" style="border-style: dashed; border-width: 2px;">
+                <i class="bi bi-plus-circle-fill fs-5 align-middle me-2"></i> Dodaj kolejną odpowiedź
+            </button>
+        </div>
+    </div>
+
+    <div class="d-flex gap-2 justify-content-end mb-5">
+        <a href="{% url 'quiz-edit' quiz.pk %}" class="btn btn-light border">Anuluj</a>
+        <button type="submit" class="btn btn-primary px-5 shadow-sm">
+            <i class="bi bi-check-lg"></i> Zapisz Pytanie
+        </button>
+    </div>
+</form>
+
+<template id="answer-form-template">
+     <div class="answer-card">
+        {{ answer_formset.empty_form.id }}
+        <div class="d-none">{{ answer_formset.empty_form.DELETE }}</div>
+        
+        <div class="row">
+            <div class="col-12 mb-3">
+                <label class="form-label small fw-bold text-muted">Treść odpowiedzi</label>
+                {{ answer_formset.empty_form.text }}
+            </div>
+
+            <div class="col-12">
+                <input type="checkbox" 
+                       name="{{ answer_formset.empty_form.is_correct.html_name }}" 
+                       id="{{ answer_formset.empty_form.is_correct.id_for_label }}" 
+                       class="btn-check">
+                
+                <label class="toggle-label py-2" for="{{ answer_formset.empty_form.is_correct.id_for_label }}">
+                    <span>
+                        <i class="bi bi-check-lg me-2"></i> Poprawna odpowiedź
+                    </span>
+                    <i class="bi bi-check-square-fill toggle-icon"></i>
+                </label>
+            </div>
+        </div>
+        
+        <div class="mt-3 text-end border-top pt-2" style="border-color: var(--border) !important;">
             <button type="button" class="btn btn-outline-danger btn-sm remove-answer-btn">
-                <i class="bi bi-trash"></i> Usuń odpowiedź
+                <i class="bi bi-trash"></i> Usuń tę odpowiedź
             </button>
         </div>
     </div>
@@ -146,11 +263,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function updateButtons() {
         let visibleForms = 0;
-        // Liczymy tylko widoczne (nieukryte klasą hidden ani stylem display:none)
         const rows = container.querySelectorAll('.answer-card');
         rows.forEach(row => {
-            const deleteInput = row.querySelector('input[id$="-DELETE"]');
-            // Jeśli input DELETE nie jest zaznaczony ORAZ wiersz nie jest ukryty
+            const deleteInput = row.querySelector('input[name$="-DELETE"]');
             if ((!deleteInput || !deleteInput.checked) && row.style.display !== 'none') {
                 visibleForms++;
             }
@@ -158,14 +273,18 @@ document.addEventListener('DOMContentLoaded', function() {
 
         let totalForms = parseInt(totalFormsInput.value, 10);
         
-        // Wyłącz przycisk "Dodaj", jeśli osiągnięto limit
-        addButton.disabled = totalForms >= maxForms;
+        if (addButton) {
+            addButton.disabled = totalForms >= maxForms;
+            if (addButton.disabled) {
+                addButton.innerHTML = '<i class="bi bi-exclamation-circle"></i> Osiągnięto limit odpowiedzi';
+            } else {
+                addButton.innerHTML = '<i class="bi bi-plus-circle-fill fs-5 align-middle me-2"></i> Dodaj kolejną odpowiedź';
+            }
+        }
 
-        // Wyłącz przyciski "Usuń", jeśli osiągnięto minimum
         container.querySelectorAll('.remove-answer-btn').forEach(button => {
             const formRow = button.closest('.answer-card');
-            // Sprawdzamy czy ten konkretny wiersz jest już "skazany na usunięcie"
-            const deleteInput = formRow.querySelector('input[id$="-DELETE"]');
+            const deleteInput = formRow.querySelector('input[name$="-DELETE"]');
             const isDeleted = deleteInput && deleteInput.checked;
             
             if (!isDeleted) {
@@ -174,40 +293,37 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // Dodawanie nowego formularza
     addButton.addEventListener('click', function() {
         let currentTotal = parseInt(totalFormsInput.value, 10);
         if (currentTotal >= maxForms) return;
 
+        // Podmieniamy __prefix__ na aktualny indeks
         const newFormHtml = template.innerHTML.replace(/__prefix__/g, currentTotal);
         
         const tempDiv = document.createElement('div');
         tempDiv.innerHTML = newFormHtml;
-        const newFormRow = tempDiv.firstElementChild; // To jest nasz div .answer-card
+        const newFormRow = tempDiv.firstElementChild; 
         
         container.appendChild(newFormRow);
         
         totalFormsInput.value = currentTotal + 1;
-        
-        // Jeśli korzystasz z TomSelect w tym formularzu, tutaj trzeba by go zainicjować dla nowego pola
-        // initTomSelect(newFormRow.querySelector('select')); 
-        
         updateButtons();
     });
 
-    // Usuwanie formularza
     container.addEventListener('click', function(e) {
         if (e.target.closest('.remove-answer-btn')) {
             const button = e.target.closest('.remove-answer-btn');
             const formRow = button.closest('.answer-card');
-            const deleteInput = formRow.querySelector('input[id$="-DELETE"]');
             
-            const idInput = formRow.querySelector('input[id$="-id"]');
+            // Szukamy pola DELETE po name (bezpieczniejsze niż id w dynamicznych formularzach)
+            const deleteInput = formRow.querySelector('input[name$="-DELETE"]');
+            const idInput = formRow.querySelector('input[name$="-id"]');
             
             if (idInput && idInput.value) {
-                // Istniejący w bazie -> zaznacz DELETE i ukryj klasą
+                // Istniejący w bazie -> zaznacz DELETE i ukryj
                 if (deleteInput) deleteInput.checked = true;
-                formRow.classList.add('hidden'); // Używamy klasy zamiast inline style
+                formRow.classList.add('hidden');
+                formRow.style.display = 'none'; // Dla pewności
             } else {
                 // Nowy -> usuń z DOM
                 formRow.remove();
